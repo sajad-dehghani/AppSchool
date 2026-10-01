@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -272,17 +272,41 @@ namespace NovinApp.Shared
         }
         public static string ConvertToPersian(DateTime date)
         {
-            PersianCalendar pc = new PersianCalendar();
-            return pc.GetYear(DateTime.Now) + "/" + (pc.GetMonth(DateTime.Now).ToString().Count() == 1 ? "0" + pc.GetMonth(DateTime.Now) : pc.GetMonth(DateTime.Now)) + "/" + (pc.GetDayOfMonth(DateTime.Now).ToString().Count() == 1 ? "0" + pc.GetDayOfMonth(DateTime.Now) : pc.GetDayOfMonth(DateTime.Now));
+            if (date == default || date == DateTime.MinValue)
+                return string.Empty;
 
+            try
+            {
+                PersianCalendar pc = new PersianCalendar();
+                int year = pc.GetYear(date);
+                int month = pc.GetMonth(date);
+                int day = pc.GetDayOfMonth(date);
+                return $"{year:0000}/{month:00}/{day:00}";
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         public static DateTime ConvertToMiladi(string date)
         {
-            string[] d = new string[3];
-            d = date.Split('/');
-            PersianCalendar g = new PersianCalendar();
-            return g.ToDateTime(int.Parse(d[0]), int.Parse(d[1]), int.Parse(d[2]), 8, 0, 0, 0);//1392/05/10
+            if (string.IsNullOrWhiteSpace(date))
+                return DateTime.MinValue;
+
+            try
+            {
+                string[] d = date.Split('/');
+                if (d.Length < 3)
+                    return DateTime.MinValue;
+
+                PersianCalendar pc = new PersianCalendar();
+                return pc.ToDateTime(int.Parse(d[0]), int.Parse(d[1]), int.Parse(d[2]), 0, 0, 0, 0);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
         }
 
         //public static PersianCalendar converttopersian(DateTime date)

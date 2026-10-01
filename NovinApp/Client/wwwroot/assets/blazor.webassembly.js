@@ -10,51 +10,104 @@
             , o = "__byte[]"
             , i = "__dotNetStream"
             , s = "__jsStreamReferenceLength";
-        let a, c;
-        class l {
+        let a, c, l;
+        class u {
             constructor(e) {
                 this._jsObject = e,
-                    this._cachedFunctions = new Map
+                    this._cachedHandlers = new Map
             }
-            findFunction(e) {
-                const t = this._cachedFunctions.get(e);
-                if (t)
-                    return t;
-                let n, r = this._jsObject;
-                if (e.split(".").forEach((t => {
-                    if (!(t in r))
-                        throw new Error(`Could not find '${e}' ('${t}' was undefined).`);
-                    n = r,
-                        r = r[t]
-                }
-                )),
-                    r instanceof Function)
-                    return r = r.bind(n),
-                        this._cachedFunctions.set(e, r),
-                        r;
-                throw new Error(`The value '${e}' is not a function.`)
+            resolveInvocationHandler(e, t) {
+                var n;
+                const r = null === (n = this._cachedHandlers.get(e)) || void 0 === n ? void 0 : n[t];
+                if (r)
+                    return r;
+                const [o, i] = I(this._jsObject, e)
+                    , s = function (e, t, n, r) {
+                        switch (n) {
+                            case l.FunctionCall:
+                                const n = e[t];
+                                if (n instanceof Function)
+                                    return n.bind(e);
+                                throw new Error(`The value '${r}' is not a function.`);
+                            case l.ConstructorCall:
+                                const o = e[t];
+                                if (o instanceof Function) {
+                                    const t = o.bind(e);
+                                    return (...e) => new t(...e)
+                                }
+                                throw new Error(`The value '${r}' is not a function.`);
+                            case l.GetValue:
+                                if (!function (e, t) {
+                                    if (!(t in e))
+                                        return !1;
+                                    for (; void 0 !== e;) {
+                                        const n = Object.getOwnPropertyDescriptor(e, t);
+                                        if (n)
+                                            return !!n.hasOwnProperty("value") || n.hasOwnProperty("get") && "function" == typeof n.get;
+                                        e = Object.getPrototypeOf(e)
+                                    }
+                                    return !1
+                                }(e, t))
+                                    throw new Error(`The property '${r}' is not defined or is not readable.`);
+                                return () => e[t];
+                            case l.SetValue:
+                                if (!function (e, t) {
+                                    if (!(t in e))
+                                        return Object.isExtensible(e);
+                                    for (; void 0 !== e;) {
+                                        const n = Object.getOwnPropertyDescriptor(e, t);
+                                        if (n)
+                                            return !(!n.hasOwnProperty("value") || !n.writable) || n.hasOwnProperty("set") && "function" == typeof n.set;
+                                        e = Object.getPrototypeOf(e)
+                                    }
+                                    return !1
+                                }(e, t))
+                                    throw new Error(`The property '${r}' is not writable.`);
+                                return (...n) => e[t] = n[0]
+                        }
+                    }(o, i, t, e);
+                return this.addHandlerToCache(e, s, t),
+                    s
             }
             getWrappedObject() {
                 return this._jsObject
             }
+            addHandlerToCache(e, t, n) {
+                const r = this._cachedHandlers.get(e);
+                r ? r[n] = t : this._cachedHandlers.set(e, {
+                    [n]: t
+                })
+            }
         }
-        const u = 0
-            , d = {
-                [u]: new l(window)
+        !function (e) {
+            e[e.FunctionCall = 1] = "FunctionCall",
+                e[e.ConstructorCall = 2] = "ConstructorCall",
+                e[e.GetValue = 3] = "GetValue",
+                e[e.SetValue = 4] = "SetValue"
+        }(l = e.JSCallType || (e.JSCallType = {}));
+        const d = 0
+            , f = {
+                [d]: new u(window)
             };
-        d[0]._cachedFunctions.set("import", (e => ("string" == typeof e && e.startsWith("./") && (e = new URL(e.substr(2), document.baseURI).toString()),
-            import(e))));
-        let f, m = 1;
-        function h(e) {
+        f[0]._cachedHandlers.set("import", {
+            [l.FunctionCall]: e => ("string" == typeof e && e.startsWith("./") && (e = new URL(e.substring(2), document.baseURI).toString()),
+                import(e))
+        });
+        let m, h = 1;
+        function p(e) {
             t.push(e)
         }
-        function p(e) {
-            if (e && "object" == typeof e) {
-                d[m] = new l(e);
-                const t = {
-                    [n]: m
+        function b(e) {
+            if (null == e)
+                return {
+                    [n]: -1
                 };
-                return m++,
+            if (e && ("object" == typeof e || e instanceof Function)) {
+                f[h] = new u(e);
+                const t = {
+                    [n]: h
+                };
+                return h++,
                     t
             }
             throw new Error(`Cannot create a JSObjectReference from the value '${e}'.`)
@@ -75,16 +128,16 @@
                 [s]: t
             };
             try {
-                const t = p(e);
+                const t = b(e);
                 r[n] = t[n]
             } catch (t) {
                 throw new Error(`Cannot create a JSStreamReference from the value '${e}'.`)
             }
             return r
         }
-        function b(e, n) {
+        function v(e, n) {
             c = e;
-            const r = n ? JSON.parse(n, ((e, n) => t.reduce(((t, n) => n(e, t)), n))) : null;
+            const r = n ? JSON.parse(n, (e, n) => t.reduce((t, n) => n(e, t), n)) : null;
             return c = void 0,
                 r
         }
@@ -96,12 +149,12 @@
             return a
         }
         e.attachDispatcher = function (e) {
-            const t = new v(e);
+            const t = new w(e);
             return void 0 === a ? a = t : a && (a = null),
                 t
         }
             ,
-            e.attachReviver = h,
+            e.attachReviver = p,
             e.invokeMethod = function (e, t, ...n) {
                 return y().invokeDotNetStaticMethod(e, t, ...n)
             }
@@ -110,11 +163,11 @@
                 return y().invokeDotNetStaticMethodAsync(e, t, ...n)
             }
             ,
-            e.createJSObjectReference = p,
+            e.createJSObjectReference = b,
             e.createJSStreamReference = g,
             e.disposeJSObjectReference = function (e) {
                 const t = e && e[n];
-                "number" == typeof t && S(t)
+                "number" == typeof t && -1 !== t && C(t)
             }
             ,
             function (e) {
@@ -122,8 +175,8 @@
                     e[e.JSObjectReference = 1] = "JSObjectReference",
                     e[e.JSStreamReference = 2] = "JSStreamReference",
                     e[e.JSVoidResult = 3] = "JSVoidResult"
-            }(f = e.JSCallResultType || (e.JSCallResultType = {}));
-        class v {
+            }(m = e.JSCallResultType || (e.JSCallResultType = {}));
+        class w {
             constructor(e) {
                 this._dotNetCallDispatcher = e,
                     this._byteArraysToBeRevived = new Map,
@@ -134,21 +187,31 @@
             getDotNetCallDispatcher() {
                 return this._dotNetCallDispatcher
             }
-            invokeJSFromDotNet(e, t, n, r) {
-                const o = b(this, t)
-                    , i = N(E(e, r)(...o || []), n);
-                return null == i ? null : k(this, i)
+            invokeJSFromDotNet(e, t, n, r, o) {
+                const i = D(this.processJSCall(r, e, o, t), n);
+                return null == i ? null : _(this, i)
             }
-            beginInvokeJSFromDotNet(e, t, n, r, o) {
-                const i = new Promise((e => {
-                    const r = b(this, n);
-                    e(E(t, o)(...r || []))
+            async beginInvokeJSFromDotNet(e, t, n, r, o, i) {
+                try {
+                    const s = this.processJSCall(o, t, i, n);
+                    if (e) {
+                        const t = _(this, [e, !0, D(await s, r)]);
+                        this._dotNetCallDispatcher.endInvokeJSFromDotNet(e, !0, t)
+                    }
+                } catch (t) {
+                    if (e) {
+                        const n = JSON.stringify([e, !1, E(t)]);
+                        this._dotNetCallDispatcher.endInvokeJSFromDotNet(e, !1, n)
+                    }
                 }
-                ));
-                e && i.then((t => k(this, [e, !0, N(t, r)]))).then((t => this._dotNetCallDispatcher.endInvokeJSFromDotNet(e, !0, t)), (t => this._dotNetCallDispatcher.endInvokeJSFromDotNet(e, !1, JSON.stringify([e, !1, w(t)]))))
+            }
+            processJSCall(e, t, n, r) {
+                var o;
+                const i = null !== (o = v(this, r)) && void 0 !== o ? o : [];
+                return S(t, e, n)(...i)
             }
             endInvokeDotNetFromJS(e, t, n) {
-                const r = t ? b(this, n) : new Error(n);
+                const r = t ? v(this, n) : new Error(n);
                 this.completePendingCall(parseInt(e, 10), t, r)
             }
             invokeDotNetStaticMethod(e, t, ...n) {
@@ -159,9 +222,9 @@
             }
             invokeDotNetMethod(e, t, n, r) {
                 if (this._dotNetCallDispatcher.invokeDotNetFromJS) {
-                    const o = k(this, r)
+                    const o = _(this, r)
                         , i = this._dotNetCallDispatcher.invokeDotNetFromJS(e, t, n, o);
-                    return i ? b(this, i) : null
+                    return i ? v(this, i) : null
                 }
                 throw new Error("The current dispatcher does not support synchronous calls from JS to .NET. Use invokeDotNetMethodAsync instead.")
             }
@@ -169,15 +232,15 @@
                 if (e && n)
                     throw new Error(`For instance method calls, assemblyName should be null. Received '${e}'.`);
                 const o = this._nextAsyncCallId++
-                    , i = new Promise(((e, t) => {
+                    , i = new Promise((e, t) => {
                         this._pendingAsyncCalls[o] = {
                             resolve: e,
                             reject: t
                         }
                     }
-                    ));
+                    );
                 try {
-                    const i = k(this, r);
+                    const i = _(this, r);
                     this._dotNetCallDispatcher.beginInvokeDotNetFromJS(o, e, t, n, i)
                 } catch (e) {
                     this.completePendingCall(o, !1, e)
@@ -198,7 +261,7 @@
                     this._pendingDotNetToJSStreams.delete(e),
                         n.resolve(t)
                 } else {
-                    const n = new I;
+                    const n = new R;
                     n.resolve(t),
                         this._pendingDotNetToJSStreams.set(e, n)
                 }
@@ -209,7 +272,7 @@
                     t = this._pendingDotNetToJSStreams.get(e).streamPromise,
                         this._pendingDotNetToJSStreams.delete(e);
                 else {
-                    const n = new I;
+                    const n = new R;
                     this._pendingDotNetToJSStreams.set(e, n),
                         t = n.streamPromise
                 }
@@ -223,21 +286,33 @@
                     t ? r.resolve(n) : r.reject(n)
             }
         }
-        function w(e) {
+        function E(e) {
             return e instanceof Error ? `${e.message}\n${e.stack}` : e ? e.toString() : "null"
         }
-        function E(e, t) {
-            const n = d[t];
-            if (n)
-                return n.findFunction(e);
+        function S(e, t, n) {
+            const r = f[t];
+            if (r)
+                return r.resolveInvocationHandler(e, null != n ? n : l.FunctionCall);
             throw new Error(`JS object instance with ID ${t} does not exist (has it been disposed?).`)
         }
-        function S(e) {
-            delete d[e]
+        function C(e) {
+            delete f[e]
         }
-        e.findJSFunction = E,
-            e.disposeJSObjectReferenceById = S;
-        class C {
+        function I(e, t) {
+            const n = t.split(".");
+            let r = e;
+            for (let e = 0; e < n.length - 1; e++) {
+                const o = n[e];
+                if (!r || "object" != typeof r || !(o in r))
+                    throw new Error(`Could not find '${t}' ('${o}' was undefined).`);
+                r = r[o]
+            }
+            return [r, n[n.length - 1]]
+        }
+        e.findJSFunction = S,
+            e.disposeJSObjectReferenceById = C,
+            e.findObjectMember = I;
+        class A {
             constructor(e, t) {
                 this._id = e,
                     this._callDispatcher = t
@@ -249,7 +324,7 @@
                 return this._callDispatcher.invokeDotNetMethodAsync(null, e, this._id, t)
             }
             dispose() {
-                this._callDispatcher.invokeDotNetMethodAsync(null, "__Dispose", this._id, null).catch((e => console.error(e)))
+                this._callDispatcher.invokeDotNetMethodAsync(null, "__Dispose", this._id, null).catch(e => console.error(e))
             }
             serializeAsArg() {
                 return {
@@ -257,14 +332,14 @@
                 }
             }
         }
-        e.DotNetObject = C,
-            h((function (e, t) {
+        e.DotNetObject = A,
+            p(function (e, t) {
                 if (t && "object" == typeof t) {
                     if (t.hasOwnProperty(r))
-                        return new C(t[r], c);
+                        return new A(t[r], c);
                     if (t.hasOwnProperty(n)) {
                         const e = t[n]
-                            , r = d[e];
+                            , r = f[e];
                         if (r)
                             return r.getWrappedObject();
                         throw new Error(`JS object instance with Id '${e}' does not exist. It may have been disposed.`)
@@ -279,13 +354,12 @@
                     if (t.hasOwnProperty(i)) {
                         const e = t[i]
                             , n = c.getDotNetStreamPromise(e);
-                        return new A(n)
+                        return new N(n)
                     }
                 }
                 return t
-            }
-            ));
-        class A {
+            });
+        class N {
             constructor(e) {
                 this._streamPromise = e
             }
@@ -296,46 +370,46 @@
                 return new Response(await this.stream()).arrayBuffer()
             }
         }
-        class I {
+        class R {
             constructor() {
-                this.streamPromise = new Promise(((e, t) => {
+                this.streamPromise = new Promise((e, t) => {
                     this.resolve = e,
                         this.reject = t
                 }
-                ))
+                )
             }
         }
-        function N(e, t) {
+        function D(e, t) {
             switch (t) {
-                case f.Default:
+                case m.Default:
                     return e;
-                case f.JSObjectReference:
-                    return p(e);
-                case f.JSStreamReference:
+                case m.JSObjectReference:
+                    return b(e);
+                case m.JSStreamReference:
                     return g(e);
-                case f.JSVoidResult:
+                case m.JSVoidResult:
                     return null;
                 default:
                     throw new Error(`Invalid JS call result type '${t}'.`)
             }
         }
-        let R = 0;
-        function k(e, t) {
-            R = 0,
+        let k = 0;
+        function _(e, t) {
+            k = 0,
                 c = e;
-            const n = JSON.stringify(t, D);
+            const n = JSON.stringify(t, O);
             return c = void 0,
                 n
         }
-        function D(e, t) {
-            if (t instanceof C)
+        function O(e, t) {
+            if (t instanceof A)
                 return t.serializeAsArg();
             if (t instanceof Uint8Array) {
-                c.getDotNetCallDispatcher().sendByteArray(R, t);
+                c.getDotNetCallDispatcher().sendByteArray(k, t);
                 const e = {
-                    [o]: R
+                    [o]: k
                 };
-                return R++,
+                return k++,
                     e
             }
             return t
@@ -397,7 +471,7 @@
         return t?.browserEventName || e
     }
     function u(e, t) {
-        e.forEach((e => i.set(e, t)))
+        e.forEach(e => i.set(e, t))
     }
     function d(e) {
         const t = [];
@@ -467,7 +541,7 @@
             }(t)) {
                 const e = t;
                 return {
-                    value: Array.from(e.options).filter((e => e.selected)).map((e => e.value))
+                    value: Array.from(e.options).filter(e => e.selected).map(e => e.value)
                 }
             }
             {
@@ -492,11 +566,11 @@
                     dataTransfer: t.dataTransfer ? {
                         dropEffect: t.dataTransfer.dropEffect,
                         effectAllowed: t.dataTransfer.effectAllowed,
-                        files: Array.from(t.dataTransfer.files).map((e => e.name)),
-                        items: Array.from(t.dataTransfer.items).map((e => ({
+                        files: Array.from(t.dataTransfer.files).map(e => e.name),
+                        items: Array.from(t.dataTransfer.items).map(e => ({
                             kind: e.kind,
                             type: e.type
-                        }))),
+                        })),
                         types: t.dataTransfer.types
                     } : null
                 };
@@ -600,20 +674,20 @@
         });
     const m = ["date", "datetime-local", "month", "time", "week"]
         , h = new Map;
-    let p, g, b = 0;
-    const y = {
+    let p, b, g = 0;
+    const v = {
         async add(e, t, n) {
             if (!n)
                 throw new Error("initialParameters must be an object, even if empty.");
-            const r = "__bl-dynamic-root:" + (++b).toString();
+            const r = "__bl-dynamic-root:" + (++g).toString();
             h.set(r, e);
             const o = await E().invokeMethodAsync("AddRootComponent", t, r)
-                , i = new w(o, g[t]);
+                , i = new w(o, b[t]);
             return await i.setParameters(n),
                 i
         }
     };
-    class v {
+    class y {
         invoke(e) {
             return this._callback(e)
         }
@@ -633,7 +707,7 @@
             this._jsEventCallbackWrappers = new Map,
                 this._componentId = e;
             for (const e of t)
-                "eventcallback" === e.type && this._jsEventCallbackWrappers.set(e.name.toLowerCase(), new v)
+                "eventcallback" === e.type && this._jsEventCallbackWrappers.set(e.name.toLowerCase(), new y)
         }
         setParameters(e) {
             const t = {}
@@ -662,22 +736,25 @@
     }
     const S = new Map
         , C = []
-        , A = new Map;
-    function I(e, t, n) {
-        return R(e, t.eventHandlerId, (() => N(e).invokeMethodAsync("DispatchEventAsync", t, n)))
+        , I = new Map;
+    function A(e) {
+        return S.has(e)
     }
-    function N(e) {
+    function N(e, t, n) {
+        return D(e, t.eventHandlerId, () => R(e).invokeMethodAsync("DispatchEventAsync", t, n))
+    }
+    function R(e) {
         const t = S.get(e);
         if (!t)
             throw new Error(`No interop methods are registered for renderer ${e}`);
         return t
     }
-    let R = (e, t, n) => n();
-    const k = O(["abort", "blur", "cancel", "canplay", "canplaythrough", "change", "close", "cuechange", "durationchange", "emptied", "ended", "error", "focus", "load", "loadeddata", "loadedmetadata", "loadend", "loadstart", "mouseenter", "mouseleave", "pointerenter", "pointerleave", "pause", "play", "playing", "progress", "ratechange", "reset", "scroll", "seeked", "seeking", "stalled", "submit", "suspend", "timeupdate", "toggle", "unload", "volumechange", "waiting", "DOMNodeInsertedIntoDocument", "DOMNodeRemovedFromDocument"])
-        , D = {
+    let D = (e, t, n) => n();
+    const k = x(["abort", "blur", "cancel", "canplay", "canplaythrough", "change", "close", "cuechange", "durationchange", "emptied", "ended", "error", "focus", "load", "loadeddata", "loadedmetadata", "loadend", "loadstart", "mouseenter", "mouseleave", "pointerenter", "pointerleave", "pause", "play", "playing", "progress", "ratechange", "reset", "scroll", "seeked", "seeking", "stalled", "submit", "suspend", "timeupdate", "toggle", "unload", "volumechange", "waiting", "DOMNodeInsertedIntoDocument", "DOMNodeRemovedFromDocument"])
+        , _ = {
             submit: !0
         }
-        , _ = O(["click", "dblclick", "mousedown", "mousemove", "mouseup"]);
+        , O = x(["click", "dblclick", "mousedown", "mousemove", "mouseup"]);
     class T {
         static {
             this.nextEventDelegatorId = 0
@@ -686,7 +763,7 @@
                 this.afterClickCallbacks = [];
             const t = ++T.nextEventDelegatorId;
             this.eventsCollectionKey = `_blazorEvents_${t}`,
-                this.eventInfoStore = new F(this.onGlobalEvent.bind(this))
+                this.eventInfoStore = new L(this.onGlobalEvent.bind(this))
         }
         setListener(e, t, n, r) {
             const o = this.getEventHandlerInfosForElement(e, !0)
@@ -715,25 +792,41 @@
                 n && n.removeHandler(t.eventName)
             }
         }
+        removeListenersForElement(e) {
+            const t = this.getEventHandlerInfosForElement(e, !1);
+            if (t) {
+                for (const e of t.enumerateHandlers())
+                    this.eventInfoStore.remove(e.eventHandlerId);
+                delete e[this.eventsCollectionKey]
+            }
+        }
         notifyAfterClick(e) {
             this.afterClickCallbacks.push(e),
                 this.eventInfoStore.addGlobalListener("click")
         }
         setStopPropagation(e, t, n) {
-            this.getEventHandlerInfosForElement(e, !0).stopPropagation(t, n)
+            const r = this.getEventHandlerInfosForElement(e, !0)
+                , o = r.stopPropagation(t);
+            r.stopPropagation(t, n),
+                !o && n ? this.eventInfoStore.addGlobalListener(t) : o && !n && this.eventInfoStore.decrementCountByEventName(t)
         }
         setPreventDefault(e, t, n) {
-            this.getEventHandlerInfosForElement(e, !0).preventDefault(t, n)
+            const r = this.getEventHandlerInfosForElement(e, !0)
+                , o = r.preventDefault(t);
+            r.preventDefault(t, n),
+                !o && n ? this.eventInfoStore.addActiveGlobalListener(t) : o && !n && this.eventInfoStore.decrementCountByEventName(t)
         }
         onGlobalEvent(e) {
             if (!(e.target instanceof Element))
+                return;
+            if (!A(this.browserRendererId))
                 return;
             this.dispatchGlobalEventToAllElements(e.type, e);
             const t = (n = e.type,
                 s.get(n));
             var n;
-            t && t.forEach((t => this.dispatchGlobalEventToAllElements(t, e))),
-                "click" === e.type && this.afterClickCallbacks.forEach((t => t(e)))
+            t && t.forEach(t => this.dispatchGlobalEventToAllElements(t, e)),
+                "click" === e.type && this.afterClickCallbacks.forEach(t => t(e))
         }
         dispatchGlobalEventToAllElements(e, t) {
             const n = t.composedPath();
@@ -743,37 +836,34 @@
             const a = Object.prototype.hasOwnProperty.call(k, e);
             let l = !1;
             for (; r;) {
-                const f = r
-                    , m = this.getEventHandlerInfosForElement(f, !1);
-                if (m) {
-                    const n = m.getHandler(e);
-                    if (n && (u = f,
-                        d = t.type,
-                        !((u instanceof HTMLButtonElement || u instanceof HTMLInputElement || u instanceof HTMLTextAreaElement || u instanceof HTMLSelectElement) && Object.prototype.hasOwnProperty.call(_, d) && u.disabled))) {
+                const u = r
+                    , d = this.getEventHandlerInfosForElement(u, !1);
+                if (d) {
+                    const n = d.getHandler(e);
+                    if (n && !M(u, t.type)) {
                         if (!s) {
                             const n = c(e);
                             i = n?.createEventArgs ? n.createEventArgs(t) : {},
                                 s = !0
                         }
-                        Object.prototype.hasOwnProperty.call(D, t.type) && t.preventDefault(),
-                            I(this.browserRendererId, {
+                        Object.prototype.hasOwnProperty.call(_, t.type) && t.preventDefault(),
+                            N(this.browserRendererId, {
                                 eventHandlerId: n.eventHandlerId,
                                 eventName: e,
                                 eventFieldInfo: o.fromEvent(n.renderingComponentId, t)
                             }, i)
                     }
-                    m.stopPropagation(e) && (l = !0),
-                        m.preventDefault(e) && t.preventDefault()
+                    d.stopPropagation(e) && (l = !0),
+                        d.preventDefault(e) && t.preventDefault()
                 }
                 r = a || l ? void 0 : n.shift()
             }
-            var u, d
         }
         getEventHandlerInfosForElement(e, t) {
-            return Object.prototype.hasOwnProperty.call(e, this.eventsCollectionKey) ? e[this.eventsCollectionKey] : t ? e[this.eventsCollectionKey] = new L : null
+            return Object.prototype.hasOwnProperty.call(e, this.eventsCollectionKey) ? e[this.eventsCollectionKey] : t ? e[this.eventsCollectionKey] = new F : null
         }
     }
-    class F {
+    class L {
         constructor(e) {
             this.globalListener = e,
                 this.infosByEventHandlerId = {},
@@ -799,6 +889,16 @@
                 document.addEventListener(e, this.globalListener, t)
             }
         }
+        addActiveGlobalListener(e) {
+            e = l(e),
+                Object.prototype.hasOwnProperty.call(this.countByEventName, e) ? (this.countByEventName[e]++,
+                    document.removeEventListener(e, this.globalListener)) : this.countByEventName[e] = 1;
+            const t = Object.prototype.hasOwnProperty.call(k, e);
+            document.addEventListener(e, this.globalListener, {
+                capture: t,
+                passive: !1
+            })
+        }
         update(e, t) {
             if (Object.prototype.hasOwnProperty.call(this.infosByEventHandlerId, t))
                 throw new Error(`Event ${t} is already tracked`);
@@ -812,10 +912,13 @@
             if (t) {
                 delete this.infosByEventHandlerId[e];
                 const n = l(t.eventName);
-                0 == --this.countByEventName[n] && (delete this.countByEventName[n],
-                    document.removeEventListener(n, this.globalListener))
+                this.decrementCountByEventName(n)
             }
             return t
+        }
+        decrementCountByEventName(e) {
+            0 === --this.countByEventName[e] && (delete this.countByEventName[e],
+                document.removeEventListener(e, this.globalListener))
         }
         handleEventNameAliasAdded(e, t) {
             if (Object.prototype.hasOwnProperty.call(this.countByEventName, e)) {
@@ -827,11 +930,15 @@
             }
         }
     }
-    class L {
+    class F {
         constructor() {
             this.handlers = {},
                 this.preventDefaultFlags = null,
                 this.stopPropagationFlags = null
+        }
+        *enumerateHandlers() {
+            for (const e in this.handlers)
+                Object.prototype.hasOwnProperty.call(this.handlers, e) && (yield this.handlers[e])
         }
         getHandler(e) {
             return Object.prototype.hasOwnProperty.call(this.handlers, e) ? this.handlers[e] : null
@@ -853,118 +960,291 @@
                 !!this.stopPropagationFlags && this.stopPropagationFlags[e]
         }
     }
-    function O(e) {
+    function x(e) {
         const t = {};
-        return e.forEach((e => {
+        return e.forEach(e => {
             t[e] = !0
         }
-        )),
+        ),
             t
     }
-    const M = Symbol()
-        , x = Symbol()
-        , P = Symbol();
-    function B(e, t) {
-        if (M in e)
+    function M(e, t) {
+        return (e instanceof HTMLButtonElement || e instanceof HTMLInputElement || e instanceof HTMLTextAreaElement || e instanceof HTMLSelectElement) && Object.prototype.hasOwnProperty.call(O, t) && e.disabled
+    }
+    const P = /^\s*Blazor-WebAssembly-Component-State:(?<state>[a-zA-Z0-9+/=]+)$/
+        , B = /^\s*Blazor-WebAssembly:[^{]*(?<options>.*)$/;
+    function H(e, t, n = "state") {
+        if (e.nodeType === Node.COMMENT_NODE) {
+            const r = e.textContent || ""
+                , o = t.exec(r)
+                , i = o && o.groups && o.groups[n];
+            return i && e.parentNode?.removeChild(e),
+                i
+        }
+        if (!e.hasChildNodes())
+            return;
+        const r = e.childNodes;
+        for (let e = 0; e < r.length; e++) {
+            const o = H(r[e], t, n);
+            if (o)
+                return o
+        }
+    }
+    function j(e, t) {
+        const n = []
+            , r = new K(e.childNodes);
+        for (; r.next() && r.currentElement;) {
+            const e = z(r, t);
+            if (e)
+                n.push(e);
+            else if (r.currentElement.hasChildNodes()) {
+                const e = j(r.currentElement, t);
+                for (let t = 0; t < e.length; t++) {
+                    const r = e[t];
+                    n.push(r)
+                }
+            }
+        }
+        return n
+    }
+    const J = new RegExp(/^\s*Blazor:[^{]*(?<descriptor>.*)$/);
+    function z(e, t) {
+        const n = e.currentElement;
+        var r, o, i;
+        if (n && n.nodeType === Node.COMMENT_NODE && n.textContent) {
+            const s = J.exec(n.textContent)
+                , a = s && s.groups && s.groups.descriptor;
+            if (!a)
+                return;
+            !function (e) {
+                if (e.parentNode instanceof Document)
+                    throw new Error("Root components cannot be marked as interactive. The <html> element must be rendered statically so that scripts are not evaluated multiple times.")
+            }(n);
+            try {
+                const s = function (e) {
+                    const t = JSON.parse(e)
+                        , { type: n } = t;
+                    if ("server" !== n && "webassembly" !== n && "auto" !== n)
+                        throw new Error(`Invalid component type '${n}'.`);
+                    return t
+                }(a)
+                    , c = function (e, t, n) {
+                        const { prerenderId: r } = e;
+                        if (r) {
+                            for (; n.next() && n.currentElement;) {
+                                const e = n.currentElement;
+                                if (e.nodeType !== Node.COMMENT_NODE)
+                                    continue;
+                                if (!e.textContent)
+                                    continue;
+                                const t = J.exec(e.textContent)
+                                    , o = t && t[1];
+                                if (o)
+                                    return V(o, r),
+                                        e
+                            }
+                            throw new Error(`Could not find an end component comment for '${t}'.`)
+                        }
+                    }(s, n, e);
+                if (t !== s.type)
+                    return;
+                switch (s.type) {
+                    case "webassembly":
+                        return o = n,
+                            i = c,
+                            U(r = s),
+                        {
+                            ...r,
+                            uniqueId: W++,
+                            start: o,
+                            end: i
+                        };
+                    case "server":
+                        return function (e, t, n) {
+                            return $(e),
+                            {
+                                ...e,
+                                uniqueId: W++,
+                                start: t,
+                                end: n
+                            }
+                        }(s, n, c);
+                    case "auto":
+                        return function (e, t, n) {
+                            return $(e),
+                                U(e),
+                            {
+                                ...e,
+                                uniqueId: W++,
+                                start: t,
+                                end: n
+                            }
+                        }(s, n, c)
+                }
+            } catch (e) {
+                throw new Error(`Found malformed component comment at ${n.textContent}`)
+            }
+        }
+    }
+    let W = 0;
+    function $(e) {
+        const { descriptor: t, sequence: n } = e;
+        if (!t)
+            throw new Error("descriptor must be defined when using a descriptor.");
+        if (void 0 === n)
+            throw new Error("sequence must be defined when using a descriptor.");
+        if (!Number.isInteger(n))
+            throw new Error(`Error parsing the sequence '${n}' for component '${JSON.stringify(e)}'`)
+    }
+    function U(e) {
+        const { assembly: t, typeName: n } = e;
+        if (!t)
+            throw new Error("assembly must be defined when using a descriptor.");
+        if (!n)
+            throw new Error("typeName must be defined when using a descriptor.");
+        e.parameterDefinitions = e.parameterDefinitions && atob(e.parameterDefinitions),
+            e.parameterValues = e.parameterValues && atob(e.parameterValues)
+    }
+    function V(e, t) {
+        const n = JSON.parse(e);
+        if (1 !== Object.keys(n).length)
+            throw new Error(`Invalid end of component comment: '${e}'`);
+        const r = n.prerenderId;
+        if (!r)
+            throw new Error(`End of component comment must have a value for the prerendered property: '${e}'`);
+        if (r !== t)
+            throw new Error(`End of component comment prerendered property must match the start comment prerender id: '${t}', '${r}'`)
+    }
+    class K {
+        constructor(e) {
+            this.childNodes = e,
+                this.currentIndex = -1,
+                this.length = e.length
+        }
+        next() {
+            return this.currentIndex++,
+                this.currentIndex < this.length ? (this.currentElement = this.childNodes[this.currentIndex],
+                    !0) : (this.currentElement = void 0,
+                        !1)
+        }
+    }
+    const G = Symbol()
+        , X = Symbol()
+        , Y = Symbol();
+    function q(e, t) {
+        if (G in e)
             return e;
         const n = [];
         if (e.childNodes.length > 0) {
             if (!t)
                 throw new Error("New logical elements must start empty, or allowExistingContents must be true");
-            e.childNodes.forEach((t => {
-                const r = B(t, !0);
-                r[x] = e,
+            e.childNodes.forEach(t => {
+                if (function (e) {
+                    if (e.nodeType !== Node.COMMENT_NODE)
+                        return !1;
+                    const t = e.textContent || "";
+                    return t.trim().startsWith("Blazor-Server-Component-State:") || t.trim().startsWith("Blazor-WebAssembly-Component-State:") || t.trim().startsWith("Blazor-Web-Initializers:") || t.trim().startsWith("Blazor-WebAssembly:")
+                }(t))
+                    return;
+                const r = q(t, !0);
+                r[X] = e,
                     n.push(r)
             }
-            ))
+            )
         }
-        return e[M] = n,
+        return e[G] = n,
             e
     }
-    function H(e) {
-        const t = K(e);
+    function Z(e) {
+        const t = ie(e);
         for (; t.length;)
-            z(e, 0)
+            te(e, 0)
     }
-    function j(e, t) {
+    function Q(e, t) {
         const n = document.createComment("!");
-        return J(n, e, t),
+        return ee(n, e, t),
             n
     }
-    function J(e, t, n) {
+    function ee(e, t, n) {
         const r = e;
         let o = e;
         if (e instanceof Comment) {
-            const t = K(r);
+            const t = ie(r);
             if (t?.length > 0) {
-                const t = G(r)
+                const t = de(r)
                     , n = new Range;
                 n.setStartBefore(e),
                     n.setEndAfter(t),
                     o = n.extractContents()
             }
         }
-        const i = W(r);
+        const i = ne(r);
         if (i) {
-            const e = K(i)
+            const e = ie(i)
                 , t = Array.prototype.indexOf.call(e, r);
             e.splice(t, 1),
-                delete r[x]
+                delete r[X]
         }
-        const s = K(t);
+        const s = ie(t);
         if (n < s.length) {
             const e = s[n];
             e.parentNode.insertBefore(o, e),
                 s.splice(n, 0, r)
         } else
-            q(o, t),
+            ue(o, t),
                 s.push(r);
-        r[x] = t,
-            M in r || (r[M] = [])
+        r[X] = t,
+            G in r || (r[G] = [])
     }
-    function z(e, t) {
-        const n = K(e).splice(t, 1)[0];
+    function te(e, t) {
+        const n = ie(e).splice(t, 1)[0];
         if (n instanceof Comment) {
-            const e = K(n);
+            const e = ie(n);
             if (e)
                 for (; e.length > 0;)
-                    z(n, 0)
+                    te(n, 0)
         }
         const r = n;
         r.parentNode.removeChild(r)
     }
-    function W(e) {
-        return e[x] || null
+    function ne(e) {
+        return e[X] || null
     }
-    function $(e, t) {
-        return K(e)[t]
+    function re(e, t) {
+        return ie(e)[t]
     }
-    function U(e) {
-        const t = Y(e);
+    function oe(e) {
+        const t = le(e);
         return "http://www.w3.org/2000/svg" === t.namespaceURI && "foreignObject" !== t.tagName
     }
-    function K(e) {
-        return e[M]
+    function ie(e) {
+        return e[G]
     }
-    function V(e) {
-        const t = K(W(e));
+    function se(e) {
+        const t = ie(ne(e));
         return t[Array.prototype.indexOf.call(t, e) + 1] || null
     }
-    function X(e, t) {
-        const n = K(e);
-        t.forEach((e => {
+    function* ae(e) {
+        const t = ie(e);
+        for (const e of t)
+            yield* ae(e);
+        yield e
+    }
+    function ce(e, t) {
+        const n = ie(e);
+        t.forEach(e => {
             e.moveRangeStart = n[e.fromSiblingIndex],
-                e.moveRangeEnd = G(e.moveRangeStart)
+                e.moveRangeEnd = de(e.moveRangeStart)
         }
-        )),
-            t.forEach((t => {
+        ),
+            t.forEach(t => {
                 const r = document.createComment("marker");
                 t.moveToBeforeMarker = r;
                 const o = n[t.toSiblingIndex + 1];
-                o ? o.parentNode.insertBefore(r, o) : q(r, e)
+                o ? o.parentNode.insertBefore(r, o) : ue(r, e)
             }
-            )),
-            t.forEach((e => {
+            ),
+            t.forEach(e => {
                 const t = e.moveToBeforeMarker
                     , n = t.parentNode
                     , r = e.moveRangeStart
@@ -979,65 +1259,65 @@
                 }
                 n.removeChild(t)
             }
-            )),
-            t.forEach((e => {
+            ),
+            t.forEach(e => {
                 n[e.toSiblingIndex] = e.moveRangeStart
             }
-            ))
+            )
     }
-    function Y(e) {
+    function le(e) {
         if (e instanceof Element || e instanceof DocumentFragment)
             return e;
         if (e instanceof Comment)
             return e.parentNode;
         throw new Error("Not a valid logical element")
     }
-    function q(e, t) {
+    function ue(e, t) {
         if (t instanceof Element || t instanceof DocumentFragment)
             t.appendChild(e);
         else {
             if (!(t instanceof Comment))
                 throw new Error(`Cannot append node because the parent is not a valid logical element. Parent: ${t}`);
             {
-                const n = V(t);
-                n ? n.parentNode.insertBefore(e, n) : q(e, W(t))
+                const n = se(t);
+                n ? n.parentNode.insertBefore(e, n) : ue(e, ne(t))
             }
         }
     }
-    function G(e) {
+    function de(e) {
         if (e instanceof Element || e instanceof DocumentFragment)
             return e;
-        const t = V(e);
+        const t = se(e);
         if (t)
             return t.previousSibling;
         {
-            const t = W(e);
-            return t instanceof Element || t instanceof DocumentFragment ? t.lastChild : G(t)
+            const t = ne(e);
+            return t instanceof Element || t instanceof DocumentFragment ? t.lastChild : de(t)
         }
     }
-    function Z(e) {
+    function fe(e) {
         return `_bl_${e}`
     }
-    const Q = "__internalId";
-    e.attachReviver(((e, t) => t && "object" == typeof t && Object.prototype.hasOwnProperty.call(t, Q) && "string" == typeof t[Q] ? function (e) {
-        const t = `[${Z(e)}]`;
+    const me = "__internalId";
+    e.attachReviver((e, t) => t && "object" == typeof t && Object.prototype.hasOwnProperty.call(t, me) && "string" == typeof t[me] ? function (e) {
+        const t = `[${fe(e)}]`;
         return document.querySelector(t)
-    }(t[Q]) : t));
-    const ee = "_blazorDeferredValue";
-    function te(e) {
+    }(t[me]) : t);
+    const he = "_blazorDeferredValue";
+    function pe(e) {
         return "select-multiple" === e.type
     }
-    function ne(e, t) {
+    function be(e, t) {
         e.value = t || ""
     }
-    function re(e, t) {
-        e instanceof HTMLSelectElement ? te(e) ? function (e, t) {
+    function ge(e, t) {
+        e instanceof HTMLSelectElement ? pe(e) ? function (e, t) {
             t ||= [];
             for (let n = 0; n < e.options.length; n++)
                 e.options[n].selected = -1 !== t.indexOf(e.options[n].value)
-        }(e, t) : ne(e, t) : e.value = t
+        }(e, t) : be(e, t) : e.value = t
     }
-    function oe(e) {
+    function ve(e) {
         const t = function (e) {
             for (; e;) {
                 if (e instanceof HTMLSelectElement)
@@ -1047,31 +1327,31 @@
             return null
         }(e);
         if (!function (e) {
-            return !!e && ee in e
+            return !!e && he in e
         }(t))
             return !1;
-        if (te(t))
+        if (pe(t))
             e.selected = -1 !== t._blazorDeferredValue.indexOf(e.value);
         else {
             if (t._blazorDeferredValue !== e.value)
                 return !1;
-            ne(t, e.value),
+            be(t, e.value),
                 delete t._blazorDeferredValue
         }
         return !0
     }
-    const ie = document.createElement("template")
-        , se = document.createElementNS("http://www.w3.org/2000/svg", "g")
-        , ae = new Set
-        , ce = Symbol()
-        , le = Symbol();
-    class ue {
+    const ye = document.createElement("template")
+        , we = document.createElementNS("http://www.w3.org/2000/svg", "g")
+        , Ee = new Set
+        , Se = Symbol()
+        , Ce = Symbol();
+    class Ie {
         constructor(e) {
             this.rootComponentIds = new Set,
                 this.childComponentLocations = {},
                 this.eventDelegator = new T(e),
-                this.eventDelegator.notifyAfterClick((e => {
-                    Se() && function (e) {
+                this.eventDelegator.notifyAfterClick(e => {
+                    Me() && function (e) {
                         if (0 !== e.button || function (e) {
                             return e.ctrlKey || e.shiftKey || e.altKey || e.metaKey
                         }(e))
@@ -1092,35 +1372,36 @@
                             const t = e.getAttribute("target");
                             return (!t || "_self" === t) && e.hasAttribute("href") && !e.hasAttribute("download")
                         }(t)) {
-                            const n = Ee(t.getAttribute("href"));
-                            ve(n) && (e.preventDefault(),
-                                Fe(n, !0, !1))
+                            const n = xe(t.getAttribute("href"));
+                            Le(n) && (e.preventDefault(),
+                                Ve(n, !0, !1))
                         }
                     }(e)
                 }
-                ))
+                )
         }
         getRootComponentCount() {
             return this.rootComponentIds.size
         }
         attachRootComponentToLogicalElement(e, t, n) {
             if (function (e) {
-                return e[ce]
+                return e[Se]
             }(t))
                 throw new Error(`Root component '${e}' could not be attached because its target element is already associated with a root component`);
-            n && (t = j(t, K(t).length)),
-                de(t, !0),
+            n && (t = Q(t, ie(t).length)),
+                Ae(t, !0),
                 this.attachComponentToElement(e, t),
                 this.rootComponentIds.add(e),
-                ae.add(t)
+                Ee.add(t)
         }
         updateComponent(e, t, n, r) {
             const o = this.childComponentLocations[t];
             if (!o)
                 throw new Error(`No element is currently associated with component ${t}`);
-            ae.delete(o) && (H(o),
+            Ee.delete(o) && (this.detachEventHandlersFromElement(o),
+                Z(o),
                 o instanceof Comment && (o.textContent = "!"));
-            const i = Y(o)?.getRootNode()
+            const i = le(o)?.getRootNode()
                 , s = i && i.activeElement;
             this.applyEdits(e, t, o, 0, n, r),
                 s instanceof HTMLElement && i && i.activeElement !== s && s.focus()
@@ -1128,8 +1409,8 @@
         disposeComponent(e) {
             if (this.rootComponentIds.delete(e)) {
                 const t = this.childComponentLocations[e];
-                de(t, !1),
-                    !0 === t[le] ? ae.add(t) : H(t)
+                Ae(t, !1),
+                    !0 === t[Ce] ? Ee.add(t) : Z(t)
             }
             delete this.childComponentLocations[e]
         }
@@ -1138,6 +1419,10 @@
         }
         attachComponentToElement(e, t) {
             this.childComponentLocations[e] = t
+        }
+        detachEventHandlersFromElement(e) {
+            for (const t of ae(e))
+                t instanceof Element && this.eventDelegator.removeListenersForElement(t)
         }
         applyEdits(e, t, r, o, i, s) {
             let a, c = 0, l = o;
@@ -1160,13 +1445,13 @@
                             break
                         }
                     case n.removeFrame:
-                        z(r, l + d.siblingIndex(u));
+                        te(r, l + d.siblingIndex(u));
                         break;
                     case n.setAttribute:
                         {
                             const n = d.newTreeIndex(u)
                                 , o = e.referenceFramesEntry(s, n)
-                                , i = $(r, l + d.siblingIndex(u));
+                                , i = re(r, l + d.siblingIndex(u));
                             if (!(i instanceof Element))
                                 throw new Error("Cannot set attribute on non-element child");
                             this.applyAttribute(e, t, i, o);
@@ -1174,7 +1459,7 @@
                         }
                     case n.removeAttribute:
                         {
-                            const e = $(r, l + d.siblingIndex(u));
+                            const e = re(r, l + d.siblingIndex(u));
                             if (!(e instanceof Element))
                                 throw new Error("Cannot remove attribute from non-element child");
                             {
@@ -1187,7 +1472,7 @@
                         {
                             const t = d.newTreeIndex(u)
                                 , n = e.referenceFramesEntry(s, t)
-                                , o = $(r, l + d.siblingIndex(u));
+                                , o = re(r, l + d.siblingIndex(u));
                             if (!(o instanceof Text))
                                 throw new Error("Cannot set text content on non-text child");
                             o.textContent = f.textContent(n);
@@ -1198,17 +1483,17 @@
                             const t = d.newTreeIndex(u)
                                 , n = e.referenceFramesEntry(s, t)
                                 , o = d.siblingIndex(u);
-                            z(r, l + o),
+                            te(r, l + o),
                                 this.insertMarkup(e, r, l + o, n);
                             break
                         }
                     case n.stepIn:
-                        r = $(r, l + d.siblingIndex(u)),
+                        r = re(r, l + d.siblingIndex(u)),
                             c++,
                             l = 0;
                         break;
                     case n.stepOut:
-                        r = W(r),
+                        r = ne(r),
                             c--,
                             l = 0 === c ? o : 0;
                         break;
@@ -1220,7 +1505,7 @@
                             });
                         break;
                     case n.permutationListEnd:
-                        X(r, a),
+                        ce(r, a),
                             a = void 0;
                         break;
                     default:
@@ -1249,7 +1534,7 @@
                     if (n instanceof Element)
                         return u = n,
                             d = c.elementReferenceCaptureId(s),
-                            u.setAttribute(Z(d), ""),
+                            u.setAttribute(fe(d), ""),
                             0;
                     throw new Error("Reference capture frames can only be children of element frames.");
                 case r.markup:
@@ -1265,14 +1550,14 @@
         insertElement(e, t, n, o, i, s, a) {
             const c = e.frameReader
                 , l = c.elementName(s)
-                , u = "svg" === l || U(n) ? document.createElementNS("http://www.w3.org/2000/svg", l) : document.createElement(l)
-                , d = B(u);
+                , u = "svg" === l || oe(n) ? document.createElementNS("http://www.w3.org/2000/svg", l) : document.createElement(l)
+                , d = q(u);
             let f = !1;
             const m = a + c.subtreeLength(s);
             for (let s = a + 1; s < m; s++) {
                 const a = e.referenceFramesEntry(i, s);
                 if (c.frameType(a) !== r.attribute) {
-                    J(u, n, o),
+                    ee(u, n, o),
                         f = !0,
                         this.insertFrameRange(e, t, d, 0, i, s, m);
                     break
@@ -1280,45 +1565,45 @@
                 this.applyAttribute(e, t, u, a)
             }
             var h;
-            f || J(u, n, o),
-                (h = u) instanceof HTMLOptionElement ? oe(h) : ee in h && re(h, h[ee])
+            f || ee(u, n, o),
+                (h = u) instanceof HTMLOptionElement ? ve(h) : he in h && ge(h, h[he])
         }
         insertComponent(e, t, n, r) {
-            const o = j(t, n)
+            const o = Q(t, n)
                 , i = e.frameReader.componentId(r);
             this.attachComponentToElement(i, o)
         }
         insertText(e, t, n, r) {
             const o = e.frameReader.textContent(r);
-            J(document.createTextNode(o), t, n)
+            ee(document.createTextNode(o), t, n)
         }
         insertMarkup(e, t, n, r) {
-            const o = j(t, n)
+            const o = Q(t, n)
                 , i = (s = e.frameReader.markupContent(r),
-                    U(t) ? (se.innerHTML = s || " ",
-                        se) : (ie.innerHTML = s || " ",
-                            ie.content.querySelectorAll("script").forEach((e => {
+                    oe(t) ? (we.innerHTML = s || " ",
+                        we) : (ye.innerHTML = s || " ",
+                            ye.content.querySelectorAll("script").forEach(e => {
                                 const t = document.createElement("script");
                                 t.textContent = e.textContent,
-                                    e.getAttributeNames().forEach((n => {
+                                    e.getAttributeNames().forEach(n => {
                                         t.setAttribute(n, e.getAttribute(n))
                                     }
-                                    )),
+                                    ),
                                     e.parentNode.replaceChild(t, e)
                             }
-                            )),
-                            ie.content));
+                            ),
+                            ye.content));
             var s;
             let a = 0;
             for (; i.firstChild;)
-                J(i.firstChild, o, a++)
+                ee(i.firstChild, o, a++)
         }
         applyAttribute(e, t, n, r) {
             const o = e.frameReader
                 , i = o.attributeName(r)
                 , s = o.attributeEventHandlerId(r);
             if (s) {
-                const e = me(i);
+                const e = Re(i);
                 return void this.eventDelegator.setListener(n, e, s, t)
             }
             const a = o.attributeValue(r);
@@ -1329,7 +1614,7 @@
             for (let a = i; a < s; a++) {
                 const i = e.referenceFramesEntry(o, a);
                 r += this.insertFrame(e, t, n, r, o, i, a),
-                    a += fe(e, i)
+                    a += Ne(e, i)
             }
             return r - a
         }
@@ -1352,13 +1637,13 @@
                                 case "INPUT":
                                 case "SELECT":
                                 case "TEXTAREA":
-                                    return t && e instanceof HTMLSelectElement && te(e) && (t = JSON.parse(t)),
-                                        re(e, t),
-                                        e[ee] = t,
+                                    return t && e instanceof HTMLSelectElement && pe(e) && (t = JSON.parse(t)),
+                                        ge(e, t),
+                                        e[he] = t,
                                         !0;
                                 case "OPTION":
                                     return t || "" === t ? e.setAttribute("value", t) : e.removeAttribute("value"),
-                                        oe(e),
+                                        ve(e),
                                         !0;
                                 default:
                                     return !1
@@ -1377,22 +1662,22 @@
         }
         applyInternalAttribute(e, t, n) {
             if (t.startsWith("stopPropagation_")) {
-                const r = me(t.substring(16));
+                const r = Re(t.substring(16));
                 this.eventDelegator.setStopPropagation(e, r, null !== n)
             } else {
                 if (!t.startsWith("preventDefault_"))
                     throw new Error(`Unsupported internal attribute '${t}'`);
                 {
-                    const r = me(t.substring(15));
+                    const r = Re(t.substring(15));
                     this.eventDelegator.setPreventDefault(e, r, null !== n)
                 }
             }
         }
     }
-    function de(e, t) {
-        e[ce] = t
+    function Ae(e, t) {
+        e[Se] = t
     }
-    function fe(e, t) {
+    function Ne(e, t) {
         const n = e.frameReader;
         switch (n.frameType(t)) {
             case r.component:
@@ -1403,101 +1688,99 @@
                 return 0
         }
     }
-    function me(e) {
+    function Re(e) {
         if (e.startsWith("on"))
             return e.substring(2);
         throw new Error(`Attribute should be an event name, but doesn't start with 'on'. Value: '${e}'`)
     }
-    const he = {};
-    let pe, ge, be = !1;
-    function ye(e, t, n, r) {
-        let o = he[e];
-        o || (o = new ue(e),
-            he[e] = o),
+    const De = {};
+    let ke, _e, Oe = !1;
+    function Te(e, t, n, r) {
+        let o = De[e];
+        o || (o = new Ie(e),
+            De[e] = o),
             o.attachRootComponentToLogicalElement(n, t, r)
     }
-    function ve(e) {
+    function Le(e) {
         const t = (n = document.baseURI).substring(0, n.lastIndexOf("/"));
         var n;
         const r = e.charAt(t.length);
         return e.startsWith(t) && ("" === r || "/" === r || "?" === r || "#" === r)
     }
-    function we(e) {
+    function Fe(e) {
         document.getElementById(e)?.scrollIntoView()
     }
-    function Ee(e) {
-        return ge = ge || document.createElement("a"),
-            ge.href = e,
-            ge.href
+    function xe(e) {
+        return _e = _e || document.createElement("a"),
+            _e.href = e,
+            _e.href
     }
-    function Se() {
-        return void 0 !== pe
+    function Me() {
+        return void 0 !== ke
     }
-    function Ce() {
-        return pe
+    function Pe() {
+        return ke
     }
-    let Ae = !1
-        , Ie = 0
-        , Ne = 0;
-    const Re = new Map;
-    let ke = async function (e) {
-        Me();
-        const t = He();
+    let Be = !1
+        , He = 0
+        , je = 0;
+    const Je = new Map;
+    let ze = async function (e) {
+        Xe();
+        const t = Qe();
         if (t?.hasLocationChangingEventListeners) {
             const n = e.state?._index ?? 0
                 , r = e.state?.userState
-                , o = n - Ie
+                , o = n - He
                 , i = location.href;
-            if (await Oe(-o),
-                !await xe(i, r, !1, t))
+            if (await Ge(-o),
+                !await Ye(i, r, !1, t))
                 return;
-            await Oe(o)
+            await Ge(o)
         }
-        await Pe(!0)
+        await qe(!0)
     }
-        , De = null;
-    const _e = {
+        , We = null;
+    const $e = {
         listenForNavigationEvents: function (e, t, n) {
-            Re.set(e, {
+            Je.set(e, {
                 rendererId: e,
                 hasLocationChangingEventListeners: !1,
                 locationChanged: t,
                 locationChanging: n
             }),
-                Ae || (Ae = !0,
-                    window.addEventListener("popstate", Be),
-                    Ie = history.state?._index ?? 0)
+                Be || (Be = !0,
+                    window.addEventListener("popstate", Ze),
+                    He = history.state?._index ?? 0)
         },
         enableNavigationInterception: function (e) {
-            if (void 0 !== pe && pe !== e)
+            if (void 0 !== ke && ke !== e)
                 throw new Error("Only one interactive runtime may enable navigation interception at a time.");
-            pe = e
+            ke = e
         },
         setHasLocationChangingListeners: function (e, t) {
-            const n = Re.get(e);
+            const n = Je.get(e);
             if (!n)
                 throw new Error(`Renderer with ID '${e}' is not listening for navigation events`);
             n.hasLocationChangingEventListeners = t
         },
         endLocationChanging: function (e, t) {
-            De && e === Ne && (De(t),
-                De = null)
+            We && e === je && (We(t),
+                We = null)
         },
         navigateTo: function (e, t) {
-            Te(e, t, !0)
+            Ue(e, t, !0)
         },
         refresh: function (e) {
             location.reload()
         },
         getBaseURI: () => document.baseURI,
         getLocationHref: () => location.href,
-        scrollToElement: we
+        scrollToElement: Fe
     };
-    function Te(e, t, n = !1) {
-        const r = Ee(e);
-        !t.forceLoad && ve(r) ? je() ? Fe(r, !1, t.replaceHistoryEntry, t.historyEntryState, n) : function () {
-            throw new Error("No enhanced programmatic navigation handler has been attached")
-        }() : function (e, t) {
+    function Ue(e, t, n = !1) {
+        const r = xe(e);
+        !t.forceLoad && Le(r) ? Ve(r, !1, t.replaceHistoryEntry, t.historyEntryState, n) : function (e, t) {
             if (location.href === e) {
                 const t = e + "?";
                 history.replaceState(null, "", t),
@@ -1506,79 +1789,80 @@
                 t ? location.replace(e) : location.href = e
         }(e, t.replaceHistoryEntry)
     }
-    async function Fe(e, t, n, r = void 0, o = !1) {
-        if (Me(),
-            function (e) {
-                const t = new URL(e);
-                return "" !== t.hash && location.origin === t.origin && location.pathname === t.pathname && location.search === t.search
-            }(e))
-            return Le(e, n, r),
+    async function Ve(e, t, n, r = void 0, o = !1) {
+        if (Xe(),
+            function (e, t) {
+                const n = new URL(e)
+                    , r = new URL(t);
+                return n.origin === r.origin && n.pathname === r.pathname && n.search === r.search && "" !== r.hash
+            }(location.href, e))
+            return Ke(e, n, r),
                 void function (e) {
                     const t = e.indexOf("#");
-                    t !== e.length - 1 && we(e.substring(t + 1))
+                    t !== e.length - 1 && Fe(e.substring(t + 1))
                 }(e);
-        const i = He();
-        (o || !i?.hasLocationChangingEventListeners || await xe(e, r, t, i)) && (be = !0,
-            Le(e, n, r),
-            await Pe(t))
+        const i = Qe();
+        (o || !i?.hasLocationChangingEventListeners || await Ye(e, r, t, i)) && (function (e, t) {
+            const n = new URL(e)
+                , r = new URL(t);
+            return n.protocol === r.protocol && n.host === r.host && n.port === r.port && n.pathname === r.pathname
+        }(e, location.href) || (Oe = !0),
+            Ke(e, n, r),
+            await qe(t))
     }
-    function Le(e, t, n = void 0) {
+    function Ke(e, t, n = void 0) {
         t ? history.replaceState({
             userState: n,
-            _index: Ie
-        }, "", e) : (Ie++,
+            _index: He
+        }, "", e) : (He++,
             history.pushState({
                 userState: n,
-                _index: Ie
+                _index: He
             }, "", e))
     }
-    function Oe(e) {
-        return new Promise((t => {
-            const n = ke;
-            ke = () => {
-                ke = n,
+    function Ge(e) {
+        return new Promise(t => {
+            const n = ze;
+            ze = () => {
+                ze = n,
                     t()
             }
                 ,
                 history.go(e)
         }
-        ))
+        )
     }
-    function Me() {
-        De && (De(!1),
-            De = null)
+    function Xe() {
+        We && (We(!1),
+            We = null)
     }
-    function xe(e, t, n, r) {
-        return new Promise((o => {
-            Me(),
-                Ne++,
-                De = o,
-                r.locationChanging(Ne, e, t, n)
+    function Ye(e, t, n, r) {
+        return new Promise(o => {
+            Xe(),
+                je++,
+                We = o,
+                r.locationChanging(je, e, t, n)
         }
-        ))
+        )
     }
-    async function Pe(e, t) {
+    async function qe(e, t) {
         const n = location.href;
-        await Promise.all(Array.from(Re, (async ([t, r]) => {
-            var o;
-            o = t,
-                S.has(o) && await r.locationChanged(n, history.state?.userState, e)
+        await Promise.all(Array.from(Je, async ([t, r]) => {
+            A(t) && await r.locationChanged(n, history.state?.userState, e)
         }
-        )))
+        ))
     }
-    async function Be(e) {
-        ke && je() && await ke(e),
-            Ie = history.state?._index ?? 0
+    async function Ze(e) {
+        ze && (Me(),
+            1) && await ze(e),
+            He = history.state?._index ?? 0
     }
-    function He() {
-        const e = Ce();
+    function Qe() {
+        const e = Pe();
         if (void 0 !== e)
-            return Re.get(e)
+            return Je.get(e)
     }
-    function je() {
-        return Se() || !0
-    }
-    const Je = {
+    const et = {
         focus: function (e, t) {
             if (e instanceof HTMLElement)
                 e.focus({
@@ -1602,16 +1886,20 @@
                 }))
         }
     }
-        , ze = {
+        , tt = {
             init: function (e, t, n, r = 50) {
-                const o = $e(t);
+                if (!(t && n && t.isConnected && n.isConnected))
+                    return;
+                const o = rt(t);
                 (o || document.documentElement).style.overflowAnchor = "none";
                 const i = document.createRange();
                 f(n.parentElement) && (t.style.display = "table-row",
                     n.style.display = "table-row");
-                const s = new IntersectionObserver((function (r) {
-                    r.forEach((r => {
+                const s = new IntersectionObserver(function (r) {
+                    r.forEach(r => {
                         if (!r.isIntersecting)
+                            return;
+                        if (!t.isConnected || !n.isConnected)
                             return;
                         i.setStartAfter(t),
                             i.setEndBefore(n);
@@ -1619,29 +1907,29 @@
                             , s = r.rootBounds?.height;
                         r.target === t ? e.invokeMethodAsync("OnSpacerBeforeVisible", r.intersectionRect.top - r.boundingClientRect.top, o, s) : r.target === n && n.offsetHeight > 0 && e.invokeMethodAsync("OnSpacerAfterVisible", r.boundingClientRect.bottom - r.intersectionRect.bottom, o, s)
                     }
-                    ))
+                    )
                 }
-                ), {
-                    root: o,
-                    rootMargin: `${r}px`
-                });
+                    , {
+                        root: o,
+                        rootMargin: `${r}px`
+                    });
                 s.observe(t),
                     s.observe(n);
                 const a = d(t)
                     , c = d(n)
-                    , { observersByDotNetObjectId: l, id: u } = Ue(e);
+                    , { observersByDotNetObjectId: l, id: u } = ot(e);
                 function d(e) {
                     const t = {
                         attributes: !0
                     }
-                        , n = new MutationObserver(((n, r) => {
-                            f(e.parentElement) && (r.disconnect(),
+                        , n = new MutationObserver((n, r) => {
+                            e.isConnected && (f(e.parentElement) && (r.disconnect(),
                                 e.style.display = "table-row",
                                 r.observe(e, t)),
                                 s.unobserve(e),
-                                s.observe(e)
+                                s.observe(e))
                         }
-                        ));
+                        );
                     return n.observe(e, t),
                         n
                 }
@@ -1655,29 +1943,29 @@
                 }
             },
             dispose: function (e) {
-                const { observersByDotNetObjectId: t, id: n } = Ue(e)
+                const { observersByDotNetObjectId: t, id: n } = ot(e)
                     , r = t[n];
                 r && (r.intersectionObserver.disconnect(),
                     r.mutationObserverBefore.disconnect(),
                     r.mutationObserverAfter.disconnect(),
-                    e.dispose(),
-                    delete t[n])
+                    delete t[n]),
+                    e.dispose()
             }
         }
-        , We = Symbol();
-    function $e(e) {
-        return e && e !== document.body && e !== document.documentElement ? "visible" !== getComputedStyle(e).overflowY ? e : $e(e.parentElement) : null
+        , nt = Symbol();
+    function rt(e) {
+        return e && e !== document.body && e !== document.documentElement ? "visible" !== getComputedStyle(e).overflowY ? e : rt(e.parentElement) : null
     }
-    function Ue(e) {
+    function ot(e) {
         const t = e._callDispatcher
             , n = e._id;
-        return t[We] ??= {},
+        return t[nt] ??= {},
         {
-            observersByDotNetObjectId: t[We],
+            observersByDotNetObjectId: t[nt],
             id: n
         }
     }
-    const Ke = {
+    const it = {
         getAndRemoveExistingTitle: function () {
             const e = document.head ? document.head.getElementsByTagName("title") : [];
             if (0 === e.length)
@@ -1686,22 +1974,21 @@
             for (let n = e.length - 1; n >= 0; n--) {
                 const r = e[n]
                     , o = r.previousSibling;
-                o instanceof Comment && null !== W(o) || (null === t && (t = r.textContent),
+                o instanceof Comment && null !== ne(o) || (null === t && (t = r.textContent),
                     r.parentNode?.removeChild(r))
             }
             return t
         }
     }
-        , Ve = {
+        , st = {
             init: function (e, t) {
                 t._blazorInputFileNextFileId = 0,
-                    t.addEventListener("click", (function () {
+                    t.addEventListener("click", function () {
                         t.value = ""
-                    }
-                    )),
-                    t.addEventListener("change", (function () {
+                    }),
+                    t.addEventListener("change", function () {
                         t._blazorFilesById = {};
-                        const n = Array.prototype.map.call(t.files, (function (e) {
+                        const n = Array.prototype.map.call(t.files, function (e) {
                             const n = {
                                 id: ++t._blazorInputFileNextFileId,
                                 lastModified: new Date(e.lastModified).toISOString(),
@@ -1714,15 +2001,13 @@
                             };
                             return t._blazorFilesById[n.id] = n,
                                 n
-                        }
-                        ));
+                        });
                         e.invokeMethodAsync("NotifyChange", n)
-                    }
-                    ))
+                    })
             },
             toImageFile: async function (e, t, n, r, o) {
-                const i = Xe(e, t)
-                    , s = await new Promise((function (e) {
+                const i = at(e, t)
+                    , s = await new Promise(function (e) {
                         const t = new Image;
                         t.onload = function () {
                             URL.revokeObjectURL(t.src),
@@ -1736,8 +2021,8 @@
                             ,
                             t.src = URL.createObjectURL(i.blob)
                     }
-                    ))
-                    , a = await new Promise((function (e) {
+                    )
+                    , a = await new Promise(function (e) {
                         const t = Math.min(1, r / s.width)
                             , i = Math.min(1, o / s.height)
                             , a = Math.min(t, i)
@@ -1747,7 +2032,7 @@
                             c.getContext("2d")?.drawImage(s, 0, 0, c.width, c.height),
                             c.toBlob(e, n)
                     }
-                    ))
+                    )
                     , c = {
                         id: ++e._blazorInputFileNextFileId,
                         lastModified: i.lastModified,
@@ -1760,34 +2045,34 @@
                     c
             },
             readFileData: async function (e, t) {
-                return Xe(e, t).blob
+                return at(e, t).blob
             }
         };
-    function Xe(e, t) {
+    function at(e, t) {
         const n = e._blazorFilesById[t];
         if (!n)
             throw new Error(`There is no file with ID ${t}. The file list may have changed. See https://aka.ms/aspnet/blazor-input-file-multiple-selections.`);
         return n
     }
-    const Ye = new Set
-        , qe = {
+    const ct = new Set
+        , lt = {
             enableNavigationPrompt: function (e) {
-                0 === Ye.size && window.addEventListener("beforeunload", Ge),
-                    Ye.add(e)
+                0 === ct.size && window.addEventListener("beforeunload", ut),
+                    ct.add(e)
             },
             disableNavigationPrompt: function (e) {
-                Ye.delete(e),
-                    0 === Ye.size && window.removeEventListener("beforeunload", Ge)
+                ct.delete(e),
+                    0 === ct.size && window.removeEventListener("beforeunload", ut)
             }
         };
-    function Ge(e) {
+    function ut(e) {
         e.preventDefault(),
             e.returnValue = !0
     }
-    const Ze = new Map
-        , Qe = {
+    const dt = new Map
+        , ft = {
             navigateTo: function (e, t, n = !1) {
-                Te(e, t instanceof Object ? t : {
+                Ue(e, t instanceof Object ? t : {
                     forceLoad: t,
                     replaceHistoryEntry: n
                 })
@@ -1800,19 +2085,19 @@
                 if (t.browserEventName) {
                     const n = s.get(t.browserEventName);
                     n ? n.push(e) : s.set(t.browserEventName, [e]),
-                        a.forEach((n => n(e, t.browserEventName)))
+                        a.forEach(n => n(e, t.browserEventName))
                 }
                 i.set(e, t)
             },
-            rootComponents: y,
+            rootComponents: v,
             runtime: {},
             _internal: {
-                navigationManager: _e,
-                domWrapper: Je,
-                Virtualize: ze,
-                PageTitle: Ke,
-                InputFile: Ve,
-                NavigationLock: qe,
+                navigationManager: $e,
+                domWrapper: et,
+                Virtualize: tt,
+                PageTitle: it,
+                InputFile: st,
+                NavigationLock: lt,
                 getJSDataStreamChunk: async function (e, t, n) {
                     return e instanceof Blob ? await async function (e, t, n) {
                         const r = e.slice(t, t + n)
@@ -1830,14 +2115,14 @@
                             if (p)
                                 throw new Error("Dynamic root components have already been enabled.");
                             p = t,
-                                g = n;
+                                b = n;
                             for (const [t, o] of Object.entries(r)) {
                                 const r = e.findJSFunction(t, 0);
                                 for (const e of o)
                                     r(e, n[e])
                             }
-                        }(N(t), r, o),
-                        A.get(t)?.[0]?.(),
+                        }(R(t), r, o),
+                        I.get(t)?.[0]?.(),
                         function (e) {
                             for (const t of C)
                                 t(e)
@@ -1845,42 +2130,42 @@
                 }
             }
         };
-    window.Blazor = Qe;
-    const et = navigator
-        , tt = et.userAgentData && et.userAgentData.brands
-        , nt = tt && tt.length > 0 ? tt.some((e => "Google Chrome" === e.brand || "Microsoft Edge" === e.brand || "Chromium" === e.brand)) : window.chrome
-        , rt = et.userAgentData?.platform ?? navigator.platform;
-    function ot(e) {
-        return 0 !== e.debugLevel && (nt || navigator.userAgent.includes("Firefox"))
+    window.Blazor = ft;
+    const mt = navigator
+        , ht = mt.userAgentData && mt.userAgentData.brands
+        , pt = ht && ht.length > 0 ? ht.some(e => "Google Chrome" === e.brand || "Microsoft Edge" === e.brand || "Chromium" === e.brand) : window.chrome
+        , bt = mt.userAgentData?.platform ?? navigator.platform;
+    function gt(e) {
+        return 0 !== e.debugLevel && (pt || navigator.userAgent.includes("Firefox"))
     }
-    let it = !1;
-    function st() {
+    let vt = !1;
+    function yt() {
         const e = document.querySelector("#blazor-error-ui");
         e && (e.style.display = "block"),
-            it || (it = !0,
-                document.querySelectorAll("#blazor-error-ui .reload").forEach((e => {
+            vt || (vt = !0,
+                document.querySelectorAll("#blazor-error-ui .reload").forEach(e => {
                     e.onclick = function (e) {
                         location.reload(),
                             e.preventDefault()
                     }
                 }
-                )),
-                document.querySelectorAll("#blazor-error-ui .dismiss").forEach((e => {
+                ),
+                document.querySelectorAll("#blazor-error-ui .dismiss").forEach(e => {
                     e.onclick = function (e) {
                         const t = document.querySelector("#blazor-error-ui");
                         t && (t.style.display = "none"),
                             e.preventDefault()
                     }
                 }
-                )))
+                ))
     }
-    var at, ct;
+    var wt, Et;
     !function (e) {
         e[e.Default = 0] = "Default",
             e[e.Server = 1] = "Server",
             e[e.WebAssembly = 2] = "WebAssembly",
             e[e.WebView = 3] = "WebView"
-    }(at || (at = {})),
+    }(wt || (wt = {})),
         function (e) {
             e[e.Trace = 0] = "Trace",
                 e[e.Debug = 1] = "Debug",
@@ -1889,8 +2174,8 @@
                 e[e.Error = 4] = "Error",
                 e[e.Critical = 5] = "Critical",
                 e[e.None = 6] = "None"
-        }(ct || (ct = {}));
-    class lt {
+        }(Et || (Et = {}));
+    class St {
         constructor(e = !0, t, n, r = 0) {
             this.singleRuntime = e,
                 this.logger = t,
@@ -1899,32 +2184,33 @@
                 n && this.afterStartedCallbacks.push(...n)
         }
         async importInitializersAsync(e, t) {
-            await Promise.all(e.map((e => async function (e, n) {
-                const r = function (e) {
-                    const t = document.baseURI;
-                    return t.endsWith("/") ? `${t}${e}` : `${t}/${e}`
-                }(n)
-                    , o = await import(r);
-                if (void 0 !== o) {
+            await Promise.all(e.map(e => async function (e, n) {
+                let r;
+                var o;
+                n.moduleExports || (o = n.name,
+                    r = new URL(o, document.baseURI).toString(),
+                    n.moduleExports = await import(r));
+                const i = n.moduleExports;
+                if (void 0 !== i) {
                     if (e.singleRuntime) {
-                        const { beforeStart: n, afterStarted: r, beforeWebAssemblyStart: s, afterWebAssemblyStarted: a, beforeServerStart: c, afterServerStarted: l } = o;
+                        const { beforeStart: n, afterStarted: r, beforeWebAssemblyStart: o, afterWebAssemblyStarted: a, beforeServerStart: c, afterServerStarted: l } = i;
                         let u = n;
-                        e.webRendererId === at.Server && c && (u = c),
-                            e.webRendererId === at.WebAssembly && s && (u = s);
+                        e.webRendererId === wt.Server && c && (u = c),
+                            e.webRendererId === wt.WebAssembly && o && (u = o);
                         let d = r;
-                        return e.webRendererId === at.Server && l && (d = l),
-                            e.webRendererId === at.WebAssembly && a && (d = a),
-                            i(e, u, d, t)
+                        return e.webRendererId === wt.Server && l && (d = l),
+                            e.webRendererId === wt.WebAssembly && a && (d = a),
+                            s(e, u, d, t)
                     }
                     return function (e, t, n) {
                         const o = n[0]
-                            , { beforeStart: s, afterStarted: a, beforeWebStart: c, afterWebStarted: l, beforeWebAssemblyStart: u, afterWebAssemblyStarted: d, beforeServerStart: f, afterServerStarted: m } = t
-                            , h = !(c || l || u || d || f || m || !s && !a)
+                            , { beforeStart: i, afterStarted: a, beforeWebStart: c, afterWebStarted: l, beforeWebAssemblyStart: u, afterWebAssemblyStarted: d, beforeServerStart: f, afterServerStarted: m } = t
+                            , h = !(c || l || u || d || f || m || !i && !a)
                             , p = h && o.enableClassicInitializers;
                         if (h && !o.enableClassicInitializers)
-                            e.logger?.log(ct.Warning, `Initializer '${r}' will be ignored because multiple runtimes are available. Use 'before(Web|WebAssembly|Server)Start' and 'after(Web|WebAssembly|Server)Started' instead.`);
+                            e.logger?.log(Et.Warning, `Initializer '${r}' will be ignored because multiple runtimes are available. Use 'before(Web|WebAssembly|Server)Start' and 'after(Web|WebAssembly|Server)Started' instead.`);
                         else if (p)
-                            return i(e, s, a, n);
+                            return s(e, i, a, n);
                         if (function (e) {
                             e.webAssembly ? e.webAssembly.initializers || (e.webAssembly.initializers = {
                                 beforeStart: [],
@@ -1952,74 +2238,78 @@
                             l && e.afterStartedCallbacks.push(l),
                             c)
                             return c(o)
-                    }(e, o, t)
+                    }(e, i, t)
                 }
-                function i(e, t, n, r) {
+                function s(e, t, n, r) {
                     if (n && e.afterStartedCallbacks.push(n),
                         t)
                         return t(...r)
                 }
-            }(this, e))))
+            }(this, e)))
         }
         async invokeAfterStartedCallbacks(e) {
             const t = (n = this.webRendererId,
-                A.get(n)?.[1]);
+                I.get(n)?.[1]);
             var n;
             t && await t,
-                await Promise.all(this.afterStartedCallbacks.map((t => t(e))))
+                await Promise.all(this.afterStartedCallbacks.map(t => t(e)))
         }
     }
-    let ut, dt, ft, mt, ht = null;
-    const pt = {
+    let Ct, It, At, Nt, Rt = null;
+    const Dt = {
         load: function (e, t) {
             return async function (e, t) {
                 const { dotnet: n } = await async function (e) {
                     if ("undefined" == typeof WebAssembly || !WebAssembly.validate)
                         throw new Error("This browser does not support WebAssembly.");
-                    let t = "_framework/dotnet.js";
                     if (e.loadBootResource) {
-                        const n = "dotnetjs"
-                            , r = e.loadBootResource(n, "dotnet.js", t, "", "js-module-dotnet");
-                        if ("string" == typeof r)
-                            t = r;
-                        else if (r)
-                            throw new Error(`For a ${n} resource, custom loaders must supply a URI string.`)
+                        const t = "dotnetjs"
+                            , n = e.loadBootResource(t, "dotnet.js", "_framework/dotnet.js", "", "js-module-dotnet");
+                        if ("string" == typeof n) {
+                            const e = new URL(n, document.baseURI).toString();
+                            return await import(e)
+                        }
+                        if (n)
+                            throw new Error(`For a ${t} resource, custom loaders must supply a URI string.`)
                     }
-                    const n = new URL(t, document.baseURI).toString();
-                    return await import(n)
+                    return await import("./dotnet.js")
                 }(e)
                     , r = function (e, t) {
                         const n = {
                             maxParallelDownloads: 1e6,
-                            enableDownloadRetry: !1,
-                            applicationEnvironment: e.environment
-                        }
-                            , r = {
-                                ...window.Module || {},
-                                onConfigLoaded: async n => {
-                                    n.environmentVariables || (n.environmentVariables = {}),
-                                        "sharded" === n.globalizationMode && (n.environmentVariables.__BLAZOR_SHARDED_ICU = "1"),
-                                        Qe._internal.getApplicationEnvironment = () => n.applicationEnvironment,
-                                        t?.(n),
-                                        mt = await async function (e, t) {
-                                            if (e.initializers)
-                                                return await Promise.all(e.initializers.beforeStart.map((t => t(e)))),
-                                                    new lt(!1, void 0, e.initializers.afterStarted, at.WebAssembly);
-                                            {
-                                                const n = [e, t.resources?.extensions ?? {}]
-                                                    , r = new lt(!0, void 0, void 0, at.WebAssembly)
-                                                    , o = Object.keys(t?.resources?.libraryInitializers || {});
-                                                return await r.importInitializersAsync(o, n),
-                                                    r
-                                            }
-                                        }(e, n)
-                                }
-                                ,
-                                onDownloadResourceProgress: gt,
-                                config: n,
-                                out: yt,
-                                err: vt
-                            };
+                            enableDownloadRetry: !1
+                        };
+                        e.environment && (n.applicationEnvironment = e.environment);
+                        const r = {
+                            ...window.Module || {},
+                            onConfigLoaded: async n => {
+                                n.environmentVariables || (n.environmentVariables = {}),
+                                    "sharded" === n.globalizationMode && (n.environmentVariables.__BLAZOR_SHARDED_ICU = "1"),
+                                    ft._internal.getApplicationEnvironment = () => n.applicationEnvironment,
+                                    t?.(n),
+                                    Nt = await async function (e, t) {
+                                        if (e.initializers)
+                                            return await Promise.all(e.initializers.beforeStart.map(t => t(e))),
+                                                new St(!1, void 0, e.initializers.afterStarted, wt.WebAssembly);
+                                        {
+                                            const n = [e, t.resources?.extensions ?? {}]
+                                                , r = new St(!0, void 0, void 0, wt.WebAssembly)
+                                                , o = t?.resources?.libraryInitializers;
+                                            let i;
+                                            return i = o ? "length" in o ? o : Object.keys(o).map(e => ({
+                                                name: e
+                                            })) : [],
+                                                await r.importInitializersAsync(i, n),
+                                                r
+                                        }
+                                    }(e, n)
+                            }
+                            ,
+                            onDownloadResourceProgress: kt,
+                            config: n,
+                            out: Ot,
+                            err: Tt
+                        };
                         return r
                     }(e, t);
                 e.applicationCulture && n.withApplicationCulture(e.applicationCulture),
@@ -2027,23 +2317,23 @@
                     e.loadBootResource && n.withResourceLoader(e.loadBootResource),
                     n.withModuleConfig(r),
                     e.configureRuntime && e.configureRuntime(n),
-                    ft = await n.create()
+                    At = await n.create()
             }(e, t)
         },
         start: function () {
             return async function () {
-                if (!ft)
+                if (!At)
                     throw new Error("The runtime must be loaded it gets configured.");
-                const { setModuleImports: t, INTERNAL: n, getConfig: r, invokeLibraryInitializers: o } = ft;
-                dt = n,
+                const { setModuleImports: t, INTERNAL: n, getConfig: r, invokeLibraryInitializers: o } = At;
+                It = n,
                     function (e) {
-                        const t = rt.match(/^Mac/i) ? "Cmd" : "Alt";
-                        ot(e) && console.info(`Debugging hotkey: Shift+${t}+D (when application has focus)`),
-                            document.addEventListener("keydown", (t => {
-                                t.shiftKey && (t.metaKey || t.altKey) && "KeyD" === t.code && (ot(e) ? navigator.userAgent.includes("Firefox") ? async function () {
+                        const t = bt.match(/^Mac/i) ? "Cmd" : "Alt";
+                        gt(e) && console.info(`Debugging hotkey: Shift+${t}+D (when application has focus)`),
+                            document.addEventListener("keydown", t => {
+                                t.shiftKey && (t.metaKey || t.altKey) && "KeyD" === t.code && (gt(e) ? navigator.userAgent.includes("Firefox") ? async function () {
                                     const e = await fetch(`_framework/debug?url=${encodeURIComponent(location.href)}&isFirefox=true`);
                                     200 !== e.status && console.warn(await e.text())
-                                }() : nt ? function () {
+                                }() : pt ? function () {
                                     const e = document.createElement("a");
                                     e.href = `_framework/debug?url=${encodeURIComponent(location.href)}`,
                                         e.target = "_blank",
@@ -2051,40 +2341,40 @@
                                         e.click()
                                 }() : console.error("Currently, only Microsoft Edge (80+), Google Chrome, or Chromium, are supported for debugging.") : console.error("Cannot start debugging, because the application was not compiled with debugging enabled."))
                             }
-                            ))
+                            )
                     }(r()),
-                    Qe.runtime = ft,
-                    Qe._internal.dotNetCriticalError = vt,
+                    ft.runtime = At,
+                    ft._internal.dotNetCriticalError = Tt,
                     t("blazor-internal", {
                         Blazor: {
-                            _internal: Qe._internal
+                            _internal: ft._internal
                         }
                     });
-                const i = await ft.getAssemblyExports("Microsoft.AspNetCore.Components.WebAssembly");
-                return Object.assign(Qe._internal, {
+                const i = await At.getAssemblyExports("Microsoft.AspNetCore.Components.WebAssembly");
+                return Object.assign(ft._internal, {
                     dotNetExports: {
                         ...i.Microsoft.AspNetCore.Components.WebAssembly.Services.DefaultWebAssemblyJSRuntime
                     }
                 }),
-                    ut = e.attachDispatcher({
+                    Ct = e.attachDispatcher({
                         beginInvokeDotNetFromJS: (e, t, n, r, o) => {
-                            if (wt(),
+                            if (Lt(),
                                 !r && !t)
                                 throw new Error("Either assemblyName or dotNetObjectId must have a non null value.");
                             const i = r ? r.toString() : t;
-                            Qe._internal.dotNetExports.BeginInvokeDotNet(e ? e.toString() : null, i, n, o)
+                            ft._internal.dotNetExports.BeginInvokeDotNet(e ? e.toString() : null, i, n, o)
                         }
                         ,
                         endInvokeJSFromDotNet: (e, t, n) => {
-                            Qe._internal.dotNetExports.EndInvokeJS(n)
+                            ft._internal.dotNetExports.EndInvokeJS(n)
                         }
                         ,
                         sendByteArray: (e, t) => {
-                            Qe._internal.dotNetExports.ReceiveByteArrayFromJS(e, t)
+                            ft._internal.dotNetExports.ReceiveByteArrayFromJS(e, t)
                         }
                         ,
-                        invokeDotNetFromJS: (e, t, n, r) => (wt(),
-                            Qe._internal.dotNetExports.InvokeDotNet(e || null, t, n ?? 0, r))
+                        invokeDotNetFromJS: (e, t, n, r) => (Lt(),
+                            ft._internal.dotNetExports.InvokeDotNet(e || null, t, n ?? 0, r))
                     }),
                 {
                     invokeLibraryInitializers: o
@@ -2093,10 +2383,10 @@
         },
         callEntryPoint: async function () {
             try {
-                await ft.runMain(ft.getConfig().mainAssemblyName, [])
+                await At.runMain(At.getConfig().mainAssemblyName, [])
             } catch (e) {
                 console.error(e),
-                    st()
+                    yt()
             }
         },
         getArrayEntryPtr: function (e, t, n) {
@@ -2109,116 +2399,116 @@
             return e + 8
         },
         readInt16Field: function (e, t) {
-            return ft.getHeapI16(e + (t || 0))
+            return At.getHeapI16(e + (t || 0))
         },
         readInt32Field: function (e, t) {
-            return ft.getHeapI32(e + (t || 0))
+            return At.getHeapI32(e + (t || 0))
         },
         readUint64Field: function (e, t) {
-            return ft.getHeapU52(e + (t || 0))
+            return At.getHeapU52(e + (t || 0))
         },
         readObjectField: function (e, t) {
-            return ft.getHeapU32(e + (t || 0))
+            return At.getHeapU32(e + (t || 0))
         },
         readStringField: function (e, t, n) {
-            const r = ft.getHeapU32(e + (t || 0));
+            const r = At.getHeapU32(e + (t || 0));
             if (0 === r)
                 return null;
             if (n) {
-                const e = dt.monoObjectAsBoolOrNullUnsafe(r);
+                const e = It.monoObjectAsBoolOrNullUnsafe(r);
                 if ("boolean" == typeof e)
                     return e ? "" : null
             }
-            return dt.monoStringToStringUnsafe(r)
+            return It.monoStringToStringUnsafe(r)
         },
         readStructField: function (e, t) {
             return e + (t || 0)
         },
         beginHeapLock: function () {
-            return wt(),
-                ht = Et.create(),
-                ht
+            return Lt(),
+                Rt = Ft.create(),
+                Rt
         },
         invokeWhenHeapUnlocked: function (e) {
-            ht ? ht.enqueuePostReleaseAction(e) : e()
+            Rt ? Rt.enqueuePostReleaseAction(e) : e()
         }
     };
-    function gt(e, t) {
+    function kt(e, t) {
         const n = e / t * 100;
         document.documentElement.style.setProperty("--blazor-load-percentage", `${n}%`),
             document.documentElement.style.setProperty("--blazor-load-percentage-text", `"${Math.floor(n)}%"`)
     }
-    const bt = ["DEBUGGING ENABLED"]
-        , yt = e => bt.indexOf(e) < 0 && console.log(e)
-        , vt = e => {
+    const _t = ["DEBUGGING ENABLED"]
+        , Ot = e => _t.indexOf(e) < 0 && console.log(e)
+        , Tt = e => {
             console.error(e || "(null)"),
-                st()
+                yt()
         }
         ;
-    function wt() {
-        if (ht)
+    function Lt() {
+        if (Rt)
             throw new Error("Assertion failed - heap is currently locked")
     }
-    class Et {
+    class Ft {
         enqueuePostReleaseAction(e) {
             this.postReleaseActions || (this.postReleaseActions = []),
                 this.postReleaseActions.push(e)
         }
         release() {
-            if (ht !== this)
+            if (Rt !== this)
                 throw new Error("Trying to release a lock which isn't current");
-            for (dt.mono_wasm_gc_unlock(),
-                ht = null; this.postReleaseActions?.length;)
+            for (It.mono_wasm_gc_unlock(),
+                Rt = null; this.postReleaseActions?.length;)
                 this.postReleaseActions.shift()(),
-                    wt()
+                    Lt()
         }
         static create() {
-            return dt.mono_wasm_gc_lock(),
-                new Et
+            return It.mono_wasm_gc_lock(),
+                new Ft
         }
     }
-    class St {
+    class xt {
         constructor(e) {
             this.batchAddress = e,
-                this.arrayRangeReader = Ct,
-                this.arrayBuilderSegmentReader = At,
-                this.diffReader = It,
-                this.editReader = Nt,
-                this.frameReader = Rt
+                this.arrayRangeReader = Mt,
+                this.arrayBuilderSegmentReader = Pt,
+                this.diffReader = Bt,
+                this.editReader = Ht,
+                this.frameReader = jt
         }
         updatedComponents() {
             return t.readStructField(this.batchAddress, 0)
         }
         referenceFrames() {
-            return t.readStructField(this.batchAddress, Ct.structLength)
+            return t.readStructField(this.batchAddress, Mt.structLength)
         }
         disposedComponentIds() {
-            return t.readStructField(this.batchAddress, 2 * Ct.structLength)
+            return t.readStructField(this.batchAddress, 2 * Mt.structLength)
         }
         disposedEventHandlerIds() {
-            return t.readStructField(this.batchAddress, 3 * Ct.structLength)
+            return t.readStructField(this.batchAddress, 3 * Mt.structLength)
         }
         updatedComponentsEntry(e, t) {
-            return kt(e, t, It.structLength)
+            return Jt(e, t, Bt.structLength)
         }
         referenceFramesEntry(e, t) {
-            return kt(e, t, Rt.structLength)
+            return Jt(e, t, jt.structLength)
         }
         disposedComponentIdsEntry(e, n) {
-            const r = kt(e, n, 4);
+            const r = Jt(e, n, 4);
             return t.readInt32Field(r)
         }
         disposedEventHandlerIdsEntry(e, n) {
-            const r = kt(e, n, 8);
+            const r = Jt(e, n, 8);
             return t.readUint64Field(r)
         }
     }
-    const Ct = {
+    const Mt = {
         structLength: 8,
         values: e => t.readObjectField(e, 0),
         count: e => t.readInt32Field(e, 4)
     }
-        , At = {
+        , Pt = {
             structLength: 12,
             values: e => {
                 const n = t.readObjectField(e, 0)
@@ -2229,13 +2519,13 @@
             offset: e => t.readInt32Field(e, 4),
             count: e => t.readInt32Field(e, 8)
         }
-        , It = {
-            structLength: 4 + At.structLength,
+        , Bt = {
+            structLength: 4 + Pt.structLength,
             componentId: e => t.readInt32Field(e, 0),
             edits: e => t.readStructField(e, 4),
-            editsEntry: (e, t) => kt(e, t, Nt.structLength)
+            editsEntry: (e, t) => Jt(e, t, Ht.structLength)
         }
-        , Nt = {
+        , Ht = {
             structLength: 20,
             editType: e => t.readInt32Field(e, 0),
             siblingIndex: e => t.readInt32Field(e, 4),
@@ -2243,7 +2533,7 @@
             moveToSiblingIndex: e => t.readInt32Field(e, 8),
             removedAttributeName: e => t.readStringField(e, 16)
         }
-        , Rt = {
+        , jt = {
             structLength: 36,
             frameType: e => t.readInt16Field(e, 4),
             subtreeLength: e => t.readInt32Field(e, 8),
@@ -2256,169 +2546,10 @@
             attributeValue: e => t.readStringField(e, 24, !0),
             attributeEventHandlerId: e => t.readUint64Field(e, 8)
         };
-    function kt(e, n, r) {
+    function Jt(e, n, r) {
         return t.getArrayEntryPtr(e, n, r)
     }
-    const Dt = /^\s*Blazor-WebAssembly-Component-State:(?<state>[a-zA-Z0-9+/=]+)$/;
-    function _t(e) {
-        return Tt(e, Dt)
-    }
-    function Tt(e, t, n = "state") {
-        if (e.nodeType === Node.COMMENT_NODE) {
-            const r = e.textContent || ""
-                , o = t.exec(r)
-                , i = o && o.groups && o.groups[n];
-            return i && e.parentNode?.removeChild(e),
-                i
-        }
-        if (!e.hasChildNodes())
-            return;
-        const r = e.childNodes;
-        for (let e = 0; e < r.length; e++) {
-            const o = Tt(r[e], t, n);
-            if (o)
-                return o
-        }
-    }
-    function Ft(e, t) {
-        const n = []
-            , r = new Wt(e.childNodes);
-        for (; r.next() && r.currentElement;) {
-            const e = Ot(r, t);
-            if (e)
-                n.push(e);
-            else if (r.currentElement.hasChildNodes()) {
-                const e = Ft(r.currentElement, t);
-                for (let t = 0; t < e.length; t++) {
-                    const r = e[t];
-                    n.push(r)
-                }
-            }
-        }
-        return n
-    }
-    const Lt = new RegExp(/^\s*Blazor:[^{]*(?<descriptor>.*)$/);
-    function Ot(e, t) {
-        const n = e.currentElement;
-        var r, o, i;
-        if (n && n.nodeType === Node.COMMENT_NODE && n.textContent) {
-            const s = Lt.exec(n.textContent)
-                , a = s && s.groups && s.groups.descriptor;
-            if (!a)
-                return;
-            !function (e) {
-                if (e.parentNode instanceof Document)
-                    throw new Error("Root components cannot be marked as interactive. The <html> element must be rendered statically so that scripts are not evaluated multiple times.")
-            }(n);
-            try {
-                const s = function (e) {
-                    const t = JSON.parse(e)
-                        , { type: n } = t;
-                    if ("server" !== n && "webassembly" !== n && "auto" !== n)
-                        throw new Error(`Invalid component type '${n}'.`);
-                    return t
-                }(a)
-                    , c = function (e, t, n) {
-                        const { prerenderId: r } = e;
-                        if (r) {
-                            for (; n.next() && n.currentElement;) {
-                                const e = n.currentElement;
-                                if (e.nodeType !== Node.COMMENT_NODE)
-                                    continue;
-                                if (!e.textContent)
-                                    continue;
-                                const t = Lt.exec(e.textContent)
-                                    , o = t && t[1];
-                                if (o)
-                                    return zt(o, r),
-                                        e
-                            }
-                            throw new Error(`Could not find an end component comment for '${t}'.`)
-                        }
-                    }(s, n, e);
-                if (t !== s.type)
-                    return;
-                switch (s.type) {
-                    case "webassembly":
-                        return o = n,
-                            i = c,
-                            Jt(r = s),
-                        {
-                            ...r,
-                            uniqueId: Ht++,
-                            start: o,
-                            end: i
-                        };
-                    case "server":
-                        return function (e, t, n) {
-                            return jt(e),
-                            {
-                                ...e,
-                                uniqueId: Ht++,
-                                start: t,
-                                end: n
-                            }
-                        }(s, n, c);
-                    case "auto":
-                        return function (e, t, n) {
-                            return jt(e),
-                                Jt(e),
-                            {
-                                ...e,
-                                uniqueId: Ht++,
-                                start: t,
-                                end: n
-                            }
-                        }(s, n, c)
-                }
-            } catch (e) {
-                throw new Error(`Found malformed component comment at ${n.textContent}`)
-            }
-        }
-    }
-    let Mt, xt, Pt, Bt, Ht = 0;
-    function jt(e) {
-        const { descriptor: t, sequence: n } = e;
-        if (!t)
-            throw new Error("descriptor must be defined when using a descriptor.");
-        if (void 0 === n)
-            throw new Error("sequence must be defined when using a descriptor.");
-        if (!Number.isInteger(n))
-            throw new Error(`Error parsing the sequence '${n}' for component '${JSON.stringify(e)}'`)
-    }
-    function Jt(e) {
-        const { assembly: t, typeName: n } = e;
-        if (!t)
-            throw new Error("assembly must be defined when using a descriptor.");
-        if (!n)
-            throw new Error("typeName must be defined when using a descriptor.");
-        e.parameterDefinitions = e.parameterDefinitions && atob(e.parameterDefinitions),
-            e.parameterValues = e.parameterValues && atob(e.parameterValues)
-    }
-    function zt(e, t) {
-        const n = JSON.parse(e);
-        if (1 !== Object.keys(n).length)
-            throw new Error(`Invalid end of component comment: '${e}'`);
-        const r = n.prerenderId;
-        if (!r)
-            throw new Error(`End of component comment must have a value for the prerendered property: '${e}'`);
-        if (r !== t)
-            throw new Error(`End of component comment prerendered property must match the start comment prerender id: '${t}', '${r}'`)
-    }
-    class Wt {
-        constructor(e) {
-            this.childNodes = e,
-                this.currentIndex = -1,
-                this.length = e.length
-        }
-        next() {
-            return this.currentIndex++,
-                this.currentIndex < this.length ? (this.currentElement = this.childNodes[this.currentIndex],
-                    !0) : (this.currentElement = void 0,
-                        !1)
-        }
-    }
-    class $t {
+    class zt {
         constructor(e) {
             this.componentManager = e
         }
@@ -2427,7 +2558,7 @@
             if (!Number.isNaN(t))
                 return function (e) {
                     const { start: t, end: n } = e
-                        , r = t[P];
+                        , r = t[Y];
                     if (r) {
                         if (r !== e)
                             throw new Error("The start component comment was already associated with another component descriptor.");
@@ -2436,20 +2567,20 @@
                     const o = t.parentNode;
                     if (!o)
                         throw new Error(`Comment not connected to the DOM ${t.textContent}`);
-                    const i = B(o, !0)
-                        , s = K(i);
-                    t[x] = i,
-                        t[P] = e;
-                    const a = B(t);
+                    const i = q(o, !0)
+                        , s = ie(i);
+                    t[X] = i,
+                        t[Y] = e;
+                    const a = q(t);
                     if (n) {
-                        const e = K(a)
+                        const e = ie(a)
                             , r = Array.prototype.indexOf.call(s, a) + 1;
                         let o = null;
                         for (; o !== n;) {
                             const n = s.splice(r, 1)[0];
                             if (!n)
                                 throw new Error("Could not find the end component comment in the parent logical node list");
-                            n[x] = t,
+                            n[X] = t,
                                 e.push(n),
                                 o = n
                         }
@@ -2473,33 +2604,34 @@
             return this.componentManager.initialComponents.length
         }
     }
-    new Promise((e => {
-        Bt = e
+    let Wt, $t, Ut, Vt;
+    new Promise(e => {
+        Vt = e
     }
-    ));
-    const Ut = new Promise((e => { }
-    ));
-    let Kt;
-    const Vt = new Promise((e => {
-        Kt = e
+    );
+    const Kt = new Promise(e => { }
+    );
+    let Gt;
+    const Xt = new Promise(e => {
+        Gt = e
     }
-    ));
-    function Xt(e) {
-        if (Mt)
+    );
+    function Yt(e) {
+        if (Wt)
             throw new Error("WebAssembly options have already been configured.");
         !async function (e) {
             const t = await e;
-            Mt = t,
-                Kt()
+            Wt = t,
+                Gt()
         }(e)
     }
-    function Yt(e) {
-        if (void 0 !== Pt)
+    function qt(e, t) {
+        if (void 0 !== Ut)
             throw new Error("Blazor WebAssembly has already started.");
-        return Pt = new Promise(qt.bind(null, e)),
-            Pt
+        return Ut = new Promise(Zt.bind(null, e, t)),
+            Ut
     }
-    async function qt(e, n, r) {
+    async function Zt(e, n, r, o) {
         (function () {
             if (window.parent !== window && !window.opener && window.frameElement) {
                 const e = window.sessionStorage && window.sessionStorage["Microsoft.AspNetCore.Components.WebAssembly.Authentication.CachedAuthSettings"]
@@ -2508,39 +2640,33 @@
             }
             return !1
         }
-        )() && await new Promise((() => { }
-        ));
-        const o = Gt();
+        )() && await new Promise(() => { }
+        );
+        const i = Qt(n);
         !function () {
-            const e = R;
-            R = (t, n, r) => {
+            const e = D;
+            D = (t, n, r) => {
                 ((e, t, n) => {
                     const r = function (e) {
-                        return he[e]
+                        return De[e]
                     }(e);
-                    r?.eventDelegator.getHandler(t) && pt.invokeWhenHeapUnlocked(n)
+                    r?.eventDelegator.getHandler(t) && Dt.invokeWhenHeapUnlocked(n)
                 }
-                )(t, n, (() => e(t, n, r)))
+                )(t, n, () => e(t, n, r))
             }
         }(),
-            Qe._internal.applyHotReload = (e, t, n, r, o) => {
-                ut.invokeDotNetStaticMethod("Microsoft.AspNetCore.Components.WebAssembly", "ApplyHotReloadDelta", e, t, n, r, o ?? null)
-            }
-            ,
-            Qe._internal.applyHotReloadDeltas = (e, t) => ut.invokeDotNetStaticMethod("Microsoft.AspNetCore.Components.WebAssembly", "ApplyHotReloadDeltas", e, t),
-            Qe._internal.getApplyUpdateCapabilities = () => ut.invokeDotNetStaticMethod("Microsoft.AspNetCore.Components.WebAssembly", "GetApplyUpdateCapabilities"),
-            Qe._internal.invokeJSJson = Zt,
-            Qe._internal.endInvokeDotNetFromJS = Qt,
-            Qe._internal.receiveWebAssemblyDotNetDataStream = en,
-            Qe._internal.receiveByteArray = tn;
-        const i = (t = pt,
+            ft._internal.invokeJSJson = en,
+            ft._internal.endInvokeDotNetFromJS = tn,
+            ft._internal.receiveWebAssemblyDotNetDataStream = nn,
+            ft._internal.receiveByteArray = rn;
+        const s = (t = Dt,
             t);
-        Qe.platform = i,
-            Qe._internal.renderBatch = (e, t) => {
-                const n = pt.beginHeapLock();
+        ft.platform = s,
+            ft._internal.renderBatch = (e, t) => {
+                const n = Dt.beginHeapLock();
                 try {
                     !function (e, t) {
-                        const n = he[e];
+                        const n = De[e];
                         if (!n)
                             throw new Error(`There is no browser renderer with ID ${e}.`);
                         const r = t.arrayRangeReader
@@ -2570,37 +2696,40 @@
                             const r = t.disposedEventHandlerIdsEntry(h, e);
                             n.disposeEventHandler(r)
                         }
-                        be && (be = !1,
+                        Oe && (Oe = !1,
                             window.scrollTo && window.scrollTo(0, 0))
-                    }(e, new St(t))
+                    }(e, new xt(t))
                 } finally {
                     n.release()
                 }
             }
             ,
-            Qe._internal.navigationManager.listenForNavigationEvents(at.WebAssembly, (async (e, t, n) => {
-                await ut.invokeDotNetStaticMethodAsync("Microsoft.AspNetCore.Components.WebAssembly", "NotifyLocationChanged", e, t, n)
+            ft._internal.navigationManager.listenForNavigationEvents(wt.WebAssembly, async (e, t, n) => {
+                await Ct.invokeDotNetStaticMethodAsync("Microsoft.AspNetCore.Components.WebAssembly", "NotifyLocationChanged", e, t, n)
             }
-            ), (async (e, t, n, r) => {
-                const o = await ut.invokeDotNetStaticMethodAsync("Microsoft.AspNetCore.Components.WebAssembly", "NotifyLocationChangingAsync", t, n, r);
-                Qe._internal.navigationManager.endLocationChanging(e, o)
-            }
-            ));
-        const s = new $t(e);
-        Qe._internal.registeredComponents = {
-            getRegisteredComponentsCount: () => s.getCount(),
-            getAssembly: e => s.getAssembly(e),
-            getTypeName: e => s.getTypeName(e),
-            getParameterDefinitions: e => s.getParameterDefinitions(e) || "",
-            getParameterValues: e => s.getParameterValues(e) || ""
+                , async (e, t, n, r) => {
+                    const o = await Ct.invokeDotNetStaticMethodAsync("Microsoft.AspNetCore.Components.WebAssembly", "NotifyLocationChangingAsync", t, n, r);
+                    ft._internal.navigationManager.endLocationChanging(e, o)
+                }
+            );
+        const a = new zt(e);
+        ft._internal.registeredComponents = {
+            getRegisteredComponentsCount: () => a.getCount(),
+            getAssembly: e => a.getAssembly(e),
+            getTypeName: e => a.getTypeName(e),
+            getParameterDefinitions: e => a.getParameterDefinitions(e) || "",
+            getParameterValues: e => a.getParameterValues(e) || ""
         },
-            Qe._internal.getPersistedState = () => _t(document) || "",
-            Qe._internal.getInitialComponentsUpdate = () => Ut,
-            Qe._internal.updateRootComponents = e => Qe._internal.dotNetExports?.UpdateRootComponentsCore(e),
-            Qe._internal.endUpdateRootComponents = t => e.onAfterUpdateRootComponents?.(t),
-            Qe._internal.attachRootComponentToElement = (e, t, n) => {
-                const r = s.resolveRegisteredElement(e);
-                r ? ye(n, r, t, !1) : function (e, t, n) {
+            ft._internal.getPersistedState = () => H(document, P) || "",
+            ft._internal.getInitialComponentsUpdate = () => Kt,
+            ft._internal.updateRootComponents = (e, t) => {
+                ft._internal.dotNetExports?.UpdateRootComponentsCore(e, t)
+            }
+            ,
+            ft._internal.endUpdateRootComponents = t => e.onAfterUpdateRootComponents?.(t),
+            ft._internal.attachRootComponentToElement = (e, t, n) => {
+                const r = a.resolveRegisteredElement(e);
+                r ? Te(n, r, t, !1) : function (e, t, n) {
                     const r = "::before";
                     let o = !1;
                     if (e.endsWith("::after"))
@@ -2616,62 +2745,71 @@
                     }(e) || document.querySelector(e);
                     if (!i)
                         throw new Error(`Could not find any element matching selector '${e}'.`);
-                    ye(n, B(i, !0), t, o)
+                    Te(n, q(i, !0), t, o)
                 }(e, t, n)
             }
             ;
         try {
-            await o,
-                await i.start()
+            await i,
+                await s.start()
         } catch (e) {
             throw new Error(`Failed to start platform. Reason: ${e}`)
         }
-        i.callEntryPoint(),
-            mt.invokeAfterStartedCallbacks(Qe),
-            n()
+        s.callEntryPoint(),
+            Nt.invokeAfterStartedCallbacks(ft),
+            r()
     }
-    function Gt() {
-        return xt ??= (async () => {
-            await Vt;
-            const e = Mt ?? {}
-                , t = Mt?.configureRuntime;
-            e.configureRuntime = e => {
-                t?.(e)
+    function Qt(e) {
+        return $t ??= (async () => {
+            await Xt;
+            const t = Wt ?? {};
+            t.environment || (t.environment = e?.environmentName ?? void 0);
+            const n = Wt?.configureRuntime;
+            t.configureRuntime = t => {
+                n?.(t),
+                    e?.environmentVariables && t.withEnvironmentVariables(e.environmentVariables)
             }
                 ,
-                await pt.load(e, Bt)
+                await Dt.load(t, Vt)
         }
         )(),
-            xt
+            $t
     }
-    function Zt(e, t, n, r, o) {
-        return 0 !== o ? (ut.beginInvokeJSFromDotNet(o, e, r, n, t),
-            null) : ut.invokeJSFromDotNet(e, r, n, t)
+    function en(e, t, n, r, o, i) {
+        return 0 !== o ? (Ct.beginInvokeJSFromDotNet(o, e, r, n, t, i),
+            null) : Ct.invokeJSFromDotNet(e, r, n, t, i)
     }
-    function Qt(e, t, n) {
-        ut.endInvokeDotNetFromJS(e, t, n)
+    function tn(e, t, n) {
+        Ct.endInvokeDotNetFromJS(e, t, n)
     }
-    function en(e, t, n, r) {
+    function nn(e, t, n, r) {
         !function (e, t, n, r, o) {
-            let i = Ze.get(t);
+            let i = dt.get(t);
             if (!i) {
                 const n = new ReadableStream({
                     start(e) {
-                        Ze.set(t, e),
+                        dt.set(t, e),
                             i = e
                     }
                 });
                 e.supplyDotNetStream(t, n)
             }
-            o ? (i.error(o),
-                Ze.delete(t)) : 0 === r ? (i.close(),
-                    Ze.delete(t)) : i.enqueue(n.length === r ? n : n.subarray(0, r))
-        }(ut, e, t, n, r)
+            if (o)
+                i.error(o),
+                    dt.delete(t);
+            else if (0 === r)
+                i.close(),
+                    dt.delete(t);
+            else {
+                const e = n.length === r ? n : new Uint8Array(n.buffer, n.byteOffset, r);
+                i.enqueue(e)
+            }
+        }(Ct, e, t, n, r)
     }
-    function tn(e, t) {
-        ut.receiveByteArray(e, t)
+    function rn(e, t) {
+        Ct.receiveByteArray(e, t)
     }
-    class nn {
+    class on {
         constructor(e) {
             this.initialComponents = e
         }
@@ -2679,12 +2817,12 @@
             return this.initialComponents[e]
         }
     }
-    class rn {
+    class sn {
         constructor() {
             this._eventListeners = new Map
         }
         static create(e) {
-            const t = new rn;
+            const t = new sn;
             return e.addEventListener = t.addEventListener.bind(t),
                 e.removeEventListener = t.removeEventListener.bind(t),
                 t
@@ -2710,18 +2848,23 @@
                 e(r)
         }
     }
-    let on = !1;
-    async function sn(e) {
-        if (on)
+    let an = !1;
+    async function cn(e) {
+        if (an)
             throw new Error("Blazor has already started.");
-        on = !0,
-            Xt(Promise.resolve(e || {})),
-            rn.create(Qe);
-        const t = Ft(document, "webassembly")
-            , n = new nn(t);
-        await Yt(n)
+        an = !0,
+            Yt(Promise.resolve(e || {})),
+            sn.create(ft);
+        const t = j(document, "webassembly")
+            , n = function () {
+                const e = H(document, B, "options");
+                if (e)
+                    return JSON.parse(e)
+            }()
+            , r = new on(t);
+        await qt(r, n)
     }
-    Qe.start = sn,
+    ft.start = cn,
         window.DotNet = e,
-        document && document.currentScript && "false" !== document.currentScript.getAttribute("autostart") && sn().catch(vt)
+        document && document.currentScript && "false" !== document.currentScript.getAttribute("autostart") && cn().catch(Tt)
 }();

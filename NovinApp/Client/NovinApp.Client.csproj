@@ -7,17 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="EPPlus" Version="7.2.2" />
-	<PackageReference Include="ExcelDataReader" Version="3.8.0" />
-	<PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
 	<PackageReference Include="Blazor-ApexCharts" Version="6.0.2" />
 	<PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
 	<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.1" />
 	<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.1" PrivateAssets="all" />
-	<PackageReference Include="Radzen.Blazor" Version="8.4.2" />
-	<PackageReference Include="MudBlazor" Version="9.4.0" />
+	<PackageReference Include="MudBlazor" Version="9.11.0" />
 	<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="10.0.1" />
-	<PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
   </ItemGroup>
 
   <ItemGroup>

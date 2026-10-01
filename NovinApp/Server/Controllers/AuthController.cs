@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using NovinApp.Server.Helpers;
 using NovinApp.Server.MyContext;
 using NovinApp.Shared;
 using NovinApp.Shared.Login;
@@ -40,10 +41,17 @@ namespace NovinApp.Server.Controllers
             var trimmedPassword = userInfo.Password.Trim();
 
             var dev = await _context.User
-                .FirstOrDefaultAsync(x => x.code_meli == trimmedUsername && x.pass == trimmedPassword && x.active == true);
+                .FirstOrDefaultAsync(x => x.code_meli == trimmedUsername && x.active == true);
 
-            if (dev == null)
+            if (dev == null || !PasswordHelper.VerifyPassword(trimmedPassword, dev.pass))
                 return BadRequest("نام کاربری یا کلمه عبور اشتباه است یا حساب غیرفعال می‌باشد");
+
+            // ارتقای خودکار پسوردهای متنی قدیمی به هش امن PBKDF2 در هنگام اولین لاگین موفق
+            if (!PasswordHelper.IsHashed(dev.pass))
+            {
+                dev.pass = PasswordHelper.HashPassword(trimmedPassword);
+                await _context.SaveChangesAsync();
+            }
 
             var token = BuildToken(dev);
 
