@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="NovinApp/Client/NovinApp.Client.csproj" />
+  <Project Path="NovinApp/Server/NovinApp.Server.csproj" />
+  <Project Path="NovinApp/Shared/NovinApp.Shared.csproj" />
+</Solution>

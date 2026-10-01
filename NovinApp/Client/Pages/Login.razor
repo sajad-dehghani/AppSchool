@@ -1,0 +1,181 @@
+@page "/Login"
+@page "/"
+@layout _Null_Layout
+@using MudBlazor
+@inject MudBlazor.ISnackbar snackBar
+@using NovinApp.Client.Component
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@using NovinApp.Shared.Login
+@inject IJSRuntime js
+@inject NavigationManager navigation
+@inject IAuthService authService
+@inject HttpClient _httpClient
+@inject IDialogService Dialog
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudRTLProvider RightToLeft="true">
+    <div class="login-page">
+        <MudItem xs="11" sm="7" md="4" lg="3" Class="pa-2">
+            <EditForm Model="@loginModel" OnValidSubmit="SubmitHandlerAsync">
+                <DataAnnotationsValidator />
+                <MudPaper Class="pa-6" Style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);">
+                    <MudText Align="Align.Center" Class="mb-4">
+                        <MudChip T="string" Size="Size.Large" Icon="@Icons.Material.Filled.School" Color="Color.Primary">
+                            ورود به سامانه نوین
+                        </MudChip>
+                    </MudText>
+
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="loginModel.Username" Label="نام کاربری (کد ملی)" T="string" Variant="Variant.Outlined"
+                                          Adornment="Adornment.End" AdornmentColor="Color.Primary" AdornmentIcon="@Icons.Material.Filled.AccountCircle"
+                                          For="@(() => loginModel.Username)" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="loginModel.Password" Label="کلمه عبور" Variant="Variant.Outlined" InputType="@PasswordInput"
+                                          AdornmentColor="Color.Primary" Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon" OnAdornmentClick="ButtonTestclick"
+                                          AdornmentAriaLabel="نمایش کلمه عبور" For="@(() => loginModel.Password)" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex justify-center mt-2">
+                            @if (!loading)
+                            {
+                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true">
+                                    ورود به سامانه
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" Disabled="true">
+                                    <span>در حال بررسی اطلاعات...</span>
+                                </MudButton>
+                            }
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (loading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+                    }
+
+                    <div class="mt-6 text-center">
+                        <MudText Typo="Typo.caption" Color="Color.Dark" Style="display: block;">
+                            سامانه هدایت تحصیلی و آزمون‌های روانشناسی
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="display: block;">
+                            نسخه ۲.۰
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </EditForm>
+        </MudItem>
+    </div>
+</MudRTLProvider>
+
+<style>
+    .login-page {
+        background-image: url('img/login.jpg');
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: center;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        margin: 0;
+        padding: 0;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    public Task<AuthenticationState>? UserState { get; set; }
+
+    private UserInfo loginModel = new UserInfo();
+    private bool isShow = false;
+    private InputType PasswordInput = InputType.Password;
+    private string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+    private bool loading = false;
+
+    private DialogOptions dialogOptions = new()
+    {
+        Position = DialogPosition.Center,
+        CloseOnEscapeKey = true,
+        NoHeader = false,
+        BackdropClick = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserState != null)
+        {
+            var authstate = await UserState;
+            if (authstate?.User?.Identity?.IsAuthenticated == true)
+            {
+                navigation.NavigateTo("/Home");
+            }
+        }
+    }
+
+    private async Task OpenDialog(string txt)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", txt);
+        await Dialog.ShowAsync<Alert_Error>("", parameters, dialogOptions);
+    }
+
+    private async Task SubmitHandlerAsync()
+    {
+        if (loading) return;
+
+        try
+        {
+            loading = true;
+
+            var userInfo = new UserInfo
+            {
+                Username = loginModel.Username?.Trim() ?? "",
+                Password = loginModel.Password?.Trim() ?? ""
+            };
+
+            bool result = await authService.LoginAsync(userInfo);
+
+            if (result)
+            {
+                navigation.NavigateTo("/Home");
+            }
+            else
+            {
+                await OpenDialog("نام کاربری یا کلمه عبور اشتباه است یا حساب کاربری غیرفعال می‌باشد.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await OpenDialog($"خطا در برقراری ارتباط با سرور: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ButtonTestclick()
+    {
+        if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+}

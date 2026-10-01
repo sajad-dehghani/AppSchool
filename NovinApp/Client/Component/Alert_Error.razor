@@ -1,0 +1,38 @@
+﻿
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem>
+                <MudImage Src="/img/animation/error.gif" Width="100" Height="100" />
+
+
+            </MudItem>
+            <MudItem>
+
+                <MudText Align="Align.Right">@mytext</MudText>
+            </MudItem>
+        </MudGrid>
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Done" Class="mt-2" OnClick="ok">تأیید</MudButton>
+
+    </DialogActions>
+</MudDialog>
+@code {
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public string mytext { get; set; }
+    void ok()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+
+    }
+    protected override void OnInitialized()
+    {
+
+    }
+
+}

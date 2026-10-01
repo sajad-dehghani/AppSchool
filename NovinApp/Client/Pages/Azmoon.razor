@@ -1,0 +1,66 @@
+@page "/Azmoon"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+<MudPaper Elevation="3" Class="pa-4 mb-4" Style="border-radius: 12px; background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%); color: white;">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.Assignment" Class="ml-2 align-middle" />
+                میز آزمون‌های من
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                آزمون‌های روانشناسی انتخاب رشته و سنجش تحصیلی فعال برای شما
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Surface" StartIcon="@Icons.Material.Filled.List" Href="/Products">
+            کاتالوگ تمام آزمون‌ها
+        </MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Class="pa-4" Elevation="3" Style="border-radius: 14px;">
+    <MudDataGrid Items="@activeExams" Filterable="false" SortMode="@SortMode.None" Groupable="false" Dense="true" Hover="true">
+        <Columns>
+            <PropertyColumn Property="x => x.Title" Title="عنوان آزمون" />
+            <PropertyColumn Property="x => x.StandardType" Title="استاندارد علمی" />
+            <PropertyColumn Property="x => x.QuestionCount" Title="تعداد سوال" />
+            <PropertyColumn Property="x => x.DurationMinutes" Title="مدت (دقیقه)" />
+            <TemplateColumn Title="وضعیت">
+                <CellTemplate>
+                    @if (context.Item.Status == "تکمیل شده")
+                    {
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">تکمیل شده</MudChip>
+                    }
+                    else if (context.Item.Status == "در حال انجام")
+                    {
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">در حال انجام</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">جدید</MudChip>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn CellClass="d-flex justify-end">
+                <CellTemplate>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Href="@context.Item.RouteUrl" Color="@context.Item.ButtonColor">
+                        @context.Item.ActionTitle
+                    </MudButton>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    public record ExamItem(string Title, string StandardType, int QuestionCount, int DurationMinutes, string Status, string ActionTitle, string RouteUrl, Color ButtonColor);
+
+    private List<ExamItem> activeExams = new()
+    {
+        new ExamItem("آزمون رغبت‌سنجی شغلی و هدایت تحصیلی", "مدل بین‌المللی هالند (RIASEC)", 24, 15, "جدید", "شروع آزمون", "/Quiz", Color.Primary),
+        new ExamItem("آزمون شخصیت‌شناسی مایرز-بریگز", "استاندارد MBTI", 60, 25, "جدید", "ورود به آزمون", "/Quiz", Color.Secondary),
+        new ExamItem("آزمون سنجش آمادگی و انگیزش کنکور", "پایش روانی-تحصیلی", 30, 15, "جدید", "شرکت در آزمون", "/Quiz", Color.Warning),
+        new ExamItem("تحلیل تراز آزمون جامع آزمایشی", "قلم‌چی / ماز / سنجش", 100, 120, "تکمیل شده", "مشاهده کارنامه", "/maping", Color.Success)
+    };
+}

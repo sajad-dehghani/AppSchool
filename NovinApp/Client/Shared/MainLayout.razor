@@ -1,0 +1,93 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@using NovinApp.Client.Service
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject UserProfileStateService UserProfileState
+
+<MudThemeProvider Theme="@my" IsDarkMode="@isdark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudRTLProvider RightToLeft="true">
+
+    <MudLayout>
+
+        <!-- Top AppBar -->
+        <MudAppBar Elevation="4" Color="Color.Primary">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                           Color="Color.Inherit"
+                           Edge="Edge.Start"
+                           OnClick="ToggleDrawer"  />
+
+            <MudText Typo="Typo.h6" Class="ml-2">
+                سامانه مشاورر نوین
+            </MudText>
+
+            <MudSpacer />
+            <MudToggleIconButton @bind-Toggled="@isdark" Class="text-white"
+                                 Icon="@Icons.Material.Outlined.DarkMode" Color="@Color.Inherit" title="تبدیل به حالت تاریک"
+                                 ToggledIcon="@Icons.Material.Outlined.LightMode" ToggledColor="@Color.Inherit" />
+
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+                <MudMenuItem Icon="@Icons.Material.Filled.AccountBox" Href="/Profile">اطلاعات پروفایل</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Password" Href="/Frm_Pass">تغییر کلمه عبور</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Logout" iconcolor="Color.Error"  Href="/logout">خروج</MudMenuItem>
+            </MudMenu>
+        </MudAppBar>
+
+        <!-- Sidebar -->
+        <MudDrawer @bind-Open="_drawerOpen"
+                   Elevation="3"
+                   Width="280px"
+                   ClipMode="DrawerClipMode.Always">
+
+            <NavMenu />   
+
+        </MudDrawer>
+
+        <!-- Main Content -->
+        <MudMainContent>
+            <MudContainer>
+
+                @Body
+            </MudContainer>
+
+        </MudMainContent>
+
+    </MudLayout>
+
+</MudRTLProvider>
+
+@code {
+        bool isdark = false;
+    MudTheme my = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            PrimaryDarken = Colors.Blue.Darken3,
+            AppbarBackground = Colors.Blue.Darken4
+          
+        },
+
+    };
+    private bool _drawerOpen = true;
+
+    void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        UserProfileState.OnChange += StateHasChanged;
+
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+    }
+
+    public void Dispose()
+    {
+        UserProfileState.OnChange -= StateHasChanged;
+    }
+}

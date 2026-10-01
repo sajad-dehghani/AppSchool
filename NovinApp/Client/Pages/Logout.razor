@@ -1,0 +1,20 @@
+﻿@page "/Logout"
+
+@using NovinApp.Client.Service
+
+@inject IAuthService authService
+@inject NavigationManager navigation
+@inject HttpClient _httpClient
+@inject MudBlazor.ISnackbar snackBar
+
+
+@code {
+
+
+    protected override async Task OnInitializedAsync()
+    {
+    await authService.LogoutAsync();
+    navigation.NavigateTo("/Login");
+    }
+
+}

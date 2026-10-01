@@ -1,0 +1,1465 @@
+@page "/StudentReports"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject HttpClient _httpClient
+@inject UserProfileStateService UserProfileState
+@inject ISnackbar snackBar
+@inject IJSRuntime JS
+@inject NavigationManager nav
+@attribute [Authorize]
+
+<div class="student-reports-page">
+    @* نوار جستجو و ابزار بالا *@
+    <MudPaper Elevation="3" Class="pa-4 mb-4 no-print" Style="border-radius: 14px; background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%); color: white;">
+        <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+            <div>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">
+                    <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="ml-2 align-middle" />
+                    سامانه کارنامه‌های تحلیلی نتایج آزمون‌های آزمایشی
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                    مشاهده کارنامه عددی، نمودار وضعیت دروس، روند پیشرفت تراز، پاسخ‌برگ چهارگزینه‌ای و تحلیل نقاط قوت و ضعف
+                </MudText>
+            </div>
+
+            @* جستجوی سریع کد ملی *@
+            <div class="d-flex align-center gap-2" style="min-width: 320px;">
+                <MudTextField @bind-Value="searchNationalCode" Placeholder="کد ملی داوطلب..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Surface"
+                              Class="bg-white rounded-lg text-dark"
+                              OnKeyDown="@HandleSearchKeyDown" />
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="() => SearchReports(searchNationalCode)" Class="rounded-lg font-weight-bold px-4">
+                    جستجو
+                </MudButton>
+            </div>
+        </div>
+    </MudPaper>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center align-center my-12">
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+            <MudText Typo="Typo.subtitle1" Class="ms-3">در حال فراخوانی کارنامه‌های آزمون دانش‌آموز...</MudText>
+        </div>
+    }
+    else if (!reportsList.Any())
+    {
+        <MudCard Elevation="2" Class="pa-6 my-6 rounded-xl text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Warning" Class="mb-3" />
+            <MudText Typo="Typo.h6" Class="font-weight-bold">کارنامه‌ای برای کد ملی «@(targetNationalCode ?? "نامشخص")» یافت نشد</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                لطفاً کد ملی را بررسی نموده یا از جدول بارگذاری فایل اکسل اقدام به ثبت نتایج نمایید.
+            </MudText>
+        </MudCard>
+    }
+    else
+    {
+        @* نوار مشخصات کلی داوطلب *@
+        <MudCard Elevation="3" Class="pa-4 mb-4 rounded-xl no-print">
+            <div class="d-flex align-center flex-wrap gap-4">
+                <div class="student-avatar-box">
+                    @if (!string.IsNullOrEmpty(UserProfileState.CurrentUser?.pic))
+                    {
+                        <img src="@UserProfileState.CurrentUser.pic" class="avatar-img-circle" alt="عکس دانش‌آموز" />
+                    }
+                    else
+                    {
+                        <div class="avatar-placeholder-circle">
+                            @(GetStudentName().Length > 0 ? GetStudentName()[0].ToString() : "د")
+                        </div>
+                    }
+                </div>
+
+                <div class="flex-grow-1">
+                    <div class="d-flex align-center gap-2 flex-wrap mb-1">
+                        <MudText Typo="Typo.h5" Class="font-weight-bold text-primary">@GetStudentName()</MudText>
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                            کد ملی: @targetNationalCode
+                        </MudChip>
+                        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Small">
+                            @(firstReport?.Student_LevelNameString ?? "متوسطه") - @(firstReport?.Student_Section_Name ?? "رشته تحصیلی")
+                        </MudChip>
+                    </div>
+                    <div class="d-flex gap-4 flex-wrap text-muted small mt-2">
+                        <span><strong>مدرسه:</strong> @(firstReport?.Student_School_Name ?? "---")</span>
+                        <span><strong>منطقه:</strong> @(firstReport?.Student_Region_Name ?? "---")</span>
+                        <span><strong>نام پدر:</strong> @(firstReport?.Student_FatherName ?? "---")</span>
+                    </div>
+                </div>
+
+                @* شاخص‌های کلیدی تراز کل *@
+                <div class="d-flex gap-2 flex-wrap">
+                    <div class="stat-pill bg-light-blue">
+                        <span class="stat-pill-title">تعداد مراحل آزمون</span>
+                        <span class="stat-pill-val">@reportsList.Count</span>
+                    </div>
+                    <div class="stat-pill bg-light-green">
+                        <span class="stat-pill-title">بالاترین تراز ثبت‌شده</span>
+                        <span class="stat-pill-val text-success">@MaxTaraz.ToString("F1")</span>
+                    </div>
+                    <div class="stat-pill bg-light-purple">
+                        <span class="stat-pill-title">میانگین تراز کل مراحل</span>
+                        <span class="stat-pill-val text-primary">@AvgTaraz.ToString("F1")</span>
+                    </div>
+                </div>
+            </div>
+        </MudCard>
+
+        @* انتخاب مرحله آزمون *@
+        <div class="d-flex align-center gap-2 mb-3 flex-wrap no-print">
+            <span class="font-weight-bold text-dark ml-2">مرحله آزمون:</span>
+            @foreach (var rep in reportsList)
+            {
+                bool isSelected = selectedReport?.ID == rep.ID;
+                <MudButton Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
+                           Color="@(isSelected ? Color.Primary : Color.Default)"
+                           Size="Size.Medium"
+                           Class="rounded-lg font-weight-bold"
+                           OnClick="() => SelectReport(rep)">
+                    @(string.IsNullOrWhiteSpace(rep.ExamName) ? "مرحله " + rep.ID : rep.ExamName)
+                    <span class="small opacity-75 mr-2">(@rep.Total_Taraz.ToString("F0"))</span>
+                </MudButton>
+            }
+        </div>
+
+        @if (selectedReport != null)
+        {
+            @* ==========================================
+               تب‌های ناوبری ۵ گانه مشابه schoolfars.ir
+               ۱. Result (نتیجه کارنامه)
+               ۲. StatusCharts (نمودارهای وضعیت دروس)
+               ۳. ProgressChart (روند پیشرفت تراز)
+               ۴. AnswerSheet (پاسخ‌برگ چهارگزینه‌ای)
+               ۵. StWe (نقاط قوت و ضعف)
+               ========================================== *@
+            <MudPaper Elevation="2" Class="mb-4 rounded-xl no-print overflow-hidden">
+                <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
+                         Color="Color.Primary" @bind-ActivePanelIndex="activeTab"
+                         PanelClass="pa-0">
+                    <MudTabPanel Text="نتیجه آزمون (Result)" Icon="@Icons.Material.Filled.TableChart" />
+                    <MudTabPanel Text="نمودارهای وضعیت دروس (StatusCharts)" Icon="@Icons.Material.Filled.BarChart" />
+                    <MudTabPanel Text="روند پیشرفت تراز (ProgressChart)" Icon="@Icons.Material.Filled.ShowChart" />
+                    <MudTabPanel Text="پاسخ‌برگ چهارگزینه‌ای (AnswerSheet)" Icon="@Icons.Material.Filled.Ballot" />
+                    <MudTabPanel Text="نقاط قوت و ضعف (StWe)" Icon="@Icons.Material.Filled.Insights" />
+                    <MudTabPanel Text="نمای کامل چاپی (PDF Report)" Icon="@Icons.Material.Filled.Print" />
+                </MudTabs>
+            </MudPaper>
+
+            <div class="detailed-report-container" id="printableStudentReport">
+                @* سربرگ اصلی کارنامه *@
+                <div class="report-header-banner">
+                    <div class="report-header-top">
+                        <div class="header-logo-section">
+                            <MudIcon Icon="@Icons.Material.Filled.School" Size="Size.Large" Class="header-icon" />
+                            <div>
+                                <h1 class="header-main-title">کارنامه تحلیلی نتایج آزمون</h1>
+                                <span class="header-sub-title">سامانه هوشمند سنجش، آزمون و هدایت تحصیلی نوین</span>
+                            </div>
+                        </div>
+                        <div class="header-exam-meta">
+                            <span class="exam-name-pill">@(string.IsNullOrWhiteSpace(selectedReport.ExamName) ? "آزمون مرحله " + selectedReport.ID : selectedReport.ExamName)</span>
+                            <span class="exam-date-text">تاریخ برگزاری: @FormatDate(selectedReport.UploadTime)</span>
+                        </div>
+                    </div>
+
+                    @* نوار مشخصات داوطلب *@
+                    <div class="report-student-profile-strip">
+                        <div class="student-photo-col">
+                            @if (!string.IsNullOrEmpty(UserProfileState.CurrentUser?.pic))
+                            {
+                                <img src="@UserProfileState.CurrentUser.pic" class="student-print-photo" alt="عکس دانش‌آموز" />
+                            }
+                            else
+                            {
+                                <div class="student-photo-placeholder">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Large" />
+                                </div>
+                            }
+                        </div>
+
+                        <div class="student-details-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">نام و نام خانوادگی:</span>
+                                <span class="meta-value font-weight-bold">@(selectedReport.Student_FullName ?? GetStudentName())</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">کد ملی:</span>
+                                <span class="meta-value">@selectedReport.Student_NationalCode</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">نام پدر:</span>
+                                <span class="meta-value">@(selectedReport.Student_FatherName ?? "---")</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">مدرسه:</span>
+                                <span class="meta-value">@(selectedReport.Student_School_Name ?? "---")</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">پایه تحصیلی:</span>
+                                <span class="meta-value">@(selectedReport.Student_LevelNameString ?? "---")</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">رشته / گروه:</span>
+                                <span class="meta-value">@(selectedReport.Student_Section_Name ?? "---")</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">منطقه آموزشی:</span>
+                                <span class="meta-value">@(selectedReport.Student_Region_Name ?? "---")</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">شماره داوطلب:</span>
+                                <span class="meta-value">@(selectedReport.StudentCode > 0 ? selectedReport.StudentCode.ToString() : selectedReport.ID.ToString())</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* شاخص‌های کلان آزمون *@
+                    <div class="overall-scores-strip">
+                        <div class="overall-score-cell taraz-cell">
+                            <span class="cell-label">تراز کل آزمون</span>
+                            <span class="cell-number">@selectedReport.Total_Taraz.ToString("F1")</span>
+                            <span class="cell-sub">بالاترین تراز: @selectedReport.Total_MaxTararz.ToString("F1")</span>
+                        </div>
+                        <div class="overall-score-cell percent-cell">
+                            <span class="cell-label">میانگین درصد کل</span>
+                            <span class="cell-number">@selectedReport.Total_Percent.ToString("F1")%</span>
+                            <span class="cell-sub">میانگین آزمون: @selectedReport.Total_PercentAvarage.ToString("F1")%</span>
+                        </div>
+                        <div class="overall-score-cell rank-cell">
+                            <span class="cell-label">رتبه در کشور</span>
+                            <span class="cell-number">@selectedReport.Total_RankTotal</span>
+                            <span class="cell-sub">حاضرین: @selectedReport.ExamStatictics_PresentCount</span>
+                        </div>
+                        <div class="overall-score-cell rank-cell">
+                            <span class="cell-label">رتبه مدرسه / منطقه</span>
+                            <span class="cell-number">@selectedReport.Total_RankSchool / @selectedReport.Total_RankArea</span>
+                            <span class="cell-sub">منطقه: @selectedReport.Student_Region_Name</span>
+                        </div>
+                        <div class="overall-score-cell answers-cell">
+                            <span class="cell-label">ترکیب پاسخ‌ها</span>
+                            <div class="answers-count-row">
+                                <span class="ans-badge correct">صحیح: @selectedReport.Total_True</span>
+                                <span class="ans-badge wrong">غلط: @selectedReport.Total_False</span>
+                                <span class="ans-badge blank">نزده: @selectedReport.Total_Blank</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* نوار گرادیان وضعیت کل داوطلب (Status Gradient Bar مشابه schoolfars.ir) *@
+                <div class="status-gradient-card mt-4">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="font-weight-bold text-dark" style="font-size: 13px;">طیف سنجش وضعیت علمی داوطلب:</span>
+                        <span class="badge-status-title @GetTotalStatusClass()">وضعیت کل: @GetTotalStatusTitle()</span>
+                    </div>
+
+                    <div id="schoolfarsBar">
+                        <div class="statusZone">بسیار ضعیف</div>
+                        <div class="statusZone">ضعیف</div>
+                        <div class="statusZone">متوسط</div>
+                        <div class="statusZone">خوب</div>
+                        <div class="statusZone">خیلی خوب</div>
+                        <div class="statusZone">عالی</div>
+                    </div>
+
+                    @* نشانگر متحرک موقعیت داوطلب روی نوار *@
+                    <div class="marker-track">
+                        <div class="status-marker-pointer" style="right: @CalcStatusMarkerRight()%;">
+                            <div class="marker-arrow-down">▼</div>
+                            <span class="marker-taraz-badge">@selectedReport.Total_Taraz.ToString("F0")</span>
+                        </div>
+                    </div>
+                </div>
+
+                @* ==========================================
+                   محتوای تب‌ها
+                   ========================================== *@
+                @if (activeTab == 0 || activeTab == 5)
+                {
+                    @* تب ۱: جدول عددی دروس (Result) *@
+                    <div class="report-section-card mt-4">
+                        <div class="section-card-header d-flex justify-space-between align-center">
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.TableChart" Class="ml-2 text-primary" />
+                                <h2 class="section-card-title">جدول عددی عملکرد داوطلب به تفکیک دروس آزمون</h2>
+                            </div>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintReport" Class="no-print font-weight-bold" Size="Size.Small">
+                                چاپ کارنامه
+                            </MudButton>
+                        </div>
+
+                        <div id="divLessons">
+                            <table class="schoolfars-table">
+                                <thead>
+                                    <tr class="rowHead">
+                                        <th class="col0">ردیف</th>
+                                        <th class="col1">نام درس</th>
+                                        <th class="col2">تعداد</th>
+                                        <th class="col3">صحیح</th>
+                                        <th class="col4">غلط</th>
+                                        <th class="col5">نزده</th>
+                                        <th class="col6">درصد</th>
+                                        <th class="col7">میانگین</th>
+                                        <th class="col8">بیشترین</th>
+                                        <th class="col9">تراز درس</th>
+                                        <th class="col10">رتبه مدرسه</th>
+                                        <th class="col11">رتبه کل</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        int rIdx = 1;
+                                    }
+                                    @foreach (var l in currentLessons)
+                                    {
+                                        string stripeClass = (rIdx % 2 == 0) ? "ev" : "odd";
+                                        <tr class="@stripeClass">
+                                            <td class="col0 text-center font-weight-bold">@(rIdx++)</td>
+                                            <td class="col1 text-right font-weight-bold lesson-title-cell">
+                                                @l.Name
+                                                @if (!string.IsNullOrWhiteSpace(l.Status))
+                                                {
+                                                    <span class="lesson-tag">@l.Status</span>
+                                                }
+                                            </td>
+                                            <td class="col2 text-center">@l.TotalQuestions</td>
+                                            <td class="col3 text-center text-success font-weight-bold">@l.TrueCount</td>
+                                            <td class="col4 text-center text-danger font-weight-bold">@l.FalseCount</td>
+                                            <td class="col5 text-center text-muted">@l.BlankCount</td>
+                                            <td class="col6 text-center font-weight-bold @(l.Percent >= 50 ? "text-success" : (l.Percent >= 25 ? "text-primary" : "text-danger"))">
+                                                @l.Percent.ToString("F1")%
+                                            </td>
+                                            <td class="col7 text-center">@l.PercentAvg.ToString("F1")%</td>
+                                            <td class="col8 text-center font-weight-bold text-primary">@l.PercentMax.ToString("F1")%</td>
+                                            <td class="col9 text-center font-weight-bold @(l.Taraz >= 5000 ? "text-success" : "text-dark")">
+                                                @l.Taraz.ToString("F1")
+                                            </td>
+                                            <td class="col10 text-center">@l.RankSchool</td>
+                                            <td class="col11 text-center font-weight-bold">@l.RankTotal</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="rowFooter">
+                                        <td class="col0 text-center font-weight-bold">Σ</td>
+                                        <td class="col1 text-right font-weight-bold">مجموع کل و میانگین</td>
+                                        <td class="col2 text-center font-weight-bold">@currentLessons.Sum(x => x.TotalQuestions)</td>
+                                        <td class="col3 text-center font-weight-bold">@selectedReport.Total_True</td>
+                                        <td class="col4 text-center font-weight-bold">@selectedReport.Total_False</td>
+                                        <td class="col5 text-center font-weight-bold">@selectedReport.Total_Blank</td>
+                                        <td class="col6 text-center font-weight-bold">@selectedReport.Total_Percent.ToString("F1")%</td>
+                                        <td class="col7 text-center">@selectedReport.Total_PercentAvarage.ToString("F1")%</td>
+                                        <td class="col8 text-center font-weight-bold">@selectedReport.Total_PercentMax.ToString("F1")%</td>
+                                        <td class="col9 text-center font-weight-bold">@selectedReport.Total_Taraz.ToString("F1")</td>
+                                        <td class="col10 text-center font-weight-bold">@selectedReport.Total_RankSchool</td>
+                                        <td class="col11 text-center font-weight-bold">@selectedReport.Total_RankTotal</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                @if (activeTab == 1 || activeTab == 5)
+                {
+                    @* تب ۲: نمودارهای وضعیت دروس (StatusCharts) *@
+                    <div class="report-section-card mt-4">
+                        <div class="section-card-header">
+                            <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="ml-2 text-primary" />
+                            <h2 class="section-card-title">نمودار مقایسه درصد داوطلب با میانگین کشوری در دروس (StatusCharts)</h2>
+                        </div>
+                        <div class="chart-content-box">
+                            @RenderLessonsBarChart()
+                        </div>
+                    </div>
+                }
+
+                @if (activeTab == 2 || activeTab == 5)
+                {
+                    @* تب ۳: روند پیشرفت تراز (ProgressChart) *@
+                    <div class="report-section-card mt-4">
+                        <div class="section-card-header">
+                            <MudIcon Icon="@Icons.Material.Filled.ShowChart" Class="ml-2 text-primary" />
+                            <h2 class="section-card-title">نمودار روند تغییرات نمرات تراز در مراحل آزمون (ProgressChart)</h2>
+                        </div>
+                        <div class="chart-content-box">
+                            @RenderTarazLineChart()
+                        </div>
+                    </div>
+                }
+
+                @if (activeTab == 3 || activeTab == 5)
+                {
+                    @* تب ۴: پاسخ‌برگ چهارگزینه‌ای (AnswerSheet) *@
+                    <div class="report-section-card mt-4">
+                        <div class="section-card-header d-flex justify-space-between align-center flex-wrap gap-2">
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Ballot" Class="ml-2 text-primary" />
+                                <h2 class="section-card-title">پاسخ‌برگ تحلیلی چهارگزینه‌ای آزمون (AnswerSheet)</h2>
+                            </div>
+                            <div class="d-flex align-center gap-3 no-print">
+                                <span class="legend-chip bg-ans-ok">✓ پاسخ صحیح داوطلب</span>
+                                <span class="legend-chip bg-ans-err">✗ پاسخ اشتباه داوطلب</span>
+                                <span class="legend-chip bg-ans-key">● کلید صحیح</span>
+                                <span class="legend-chip bg-ans-blank">○ بدون پاسخ (سفید)</span>
+                            </div>
+                        </div>
+
+                        <!-- نوار وضعیت، آمار و تنظیم سقف سوالات پاسخ‌برگ -->
+                        <div class="d-flex justify-space-between align-center flex-wrap gap-3 py-2 px-3 my-2 rounded-lg bg-light-subtle border no-print" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                            <div class="d-flex align-center gap-2 flex-wrap">
+                                <span class="fw-bold text-secondary" style="font-size: 0.85rem;">خلاصه پاسخ‌برگ:</span>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                    تعداد سوالات: @currentAnswers.Count (حداکثر پیش‌فرض: ۳۰۰)
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+                                    صحیح: @currentAnswers.Count(x => x.IsCorrect)
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">
+                                    اشتباه: @currentAnswers.Count(x => x.IsWrong)
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                    سفید: @currentAnswers.Count(x => x.IsBlank)
+                                </MudChip>
+                            </div>
+
+                            <div class="d-flex align-center gap-1">
+                                <span class="text-secondary ml-1" style="font-size: 0.8rem;">سقف نمایش:</span>
+                                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                                    <MudButton Variant="@(maxAnswerSheetQuestions == 100 ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SetMaxQuestions(100))">۱۰۰</MudButton>
+                                    <MudButton Variant="@(maxAnswerSheetQuestions == 200 ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SetMaxQuestions(200))">۲۰۰</MudButton>
+                                    <MudButton Variant="@(maxAnswerSheetQuestions == 300 ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SetMaxQuestions(300))">۳۰۰ (پیش‌فرض)</MudButton>
+                                    <MudButton Variant="@(maxAnswerSheetQuestions == 0 ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SetMaxQuestions(0))">همه</MudButton>
+                                </MudButtonGroup>
+                            </div>
+                        </div>
+
+                        @if (!currentAnswers.Any())
+                        {
+                            <MudAlert Severity="Severity.Normal" Class="my-3">
+                                اطلاعات کلید و پاسخ‌برگ این آزمون در سیستم بارگذاری نشده است.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <div class="containerAnswer mt-3">
+                                @foreach (var ans in currentAnswers)
+                                {
+                                    <div class="colAnswer">
+                                        <span class="rank">@ans.QuestionNumber</span>
+                                        <div class="options-bubbles-row">
+                                            @for (int opt = 1; opt <= 4; opt++)
+                                            {
+                                                int currentOpt = opt;
+                                                bool isKey = ans.CorrectKey == currentOpt;
+                                                bool isPicked = ans.StudentChoice == currentOpt;
+
+                                                string bClass = "aBubble";
+                                                if (isPicked && isKey) { bClass += " answerPicked"; }
+                                                else if (isPicked && !isKey) { bClass += " wrongPicked"; }
+                                                else if (!isPicked && isKey) { bClass += " correctKeyOnly"; }
+
+                                                <span class="@bClass">
+                                                    @currentOpt
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (activeTab == 4 || activeTab == 5)
+                {
+                    @* تب ۵: نقاط قوت و ضعف (StWe) *@
+                    <div class="report-section-card mt-4 mb-4">
+                        <div class="section-card-header">
+                            <MudIcon Icon="@Icons.Material.Filled.Insights" Class="ml-2 text-primary" />
+                            <h2 class="section-card-title">تحلیل جامع نقاط قوت و ضعف داوطلب (StWe)</h2>
+                        </div>
+
+                        <div class="strengths-weaknesses-grid">
+                            @* کارت نقاط قوت *@
+                            <div class="sw-card strength-card">
+                                <div class="sw-card-header">
+                                    <span class="sw-icon">🌟</span>
+                                    <h3>نقاط قوت داوطلب (Strengths)</h3>
+                                </div>
+                                <div class="sw-card-body">
+                                    @if (!string.IsNullOrWhiteSpace(selectedReport.GetStrength))
+                                    {
+                                        <p class="sw-text">@selectedReport.GetStrength</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="sw-list">
+                                            @foreach (var strongLesson in currentLessons.Where(l => l.Percent >= 35 || l.Taraz >= 5300).OrderByDescending(l => l.Percent))
+                                            {
+                                                <li>
+                                                    <strong>درس @strongLesson.Name:</strong>
+                                                    کسب درصد مطلوب <strong>@strongLesson.Percent.ToString("F1")%</strong> و تراز <strong>@strongLesson.Taraz.ToString("F1")</strong> با @strongLesson.TrueCount پاسخ صحیح بیانگر تسلط مفهومی بالا در این مباحث است.
+                                                </li>
+                                            }
+                                            @if (!currentLessons.Any(l => l.Percent >= 35 || l.Taraz >= 5300))
+                                            {
+                                                <li>مدیریت تعداد پاسخ‌های غلط در دروس پایه و پاسخ‌گویی دقیق به تست‌های ساده‌تر.</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+
+                            @* کارت نقاط ضعف *@
+                            <div class="sw-card weakness-card">
+                                <div class="sw-card-header">
+                                    <span class="sw-icon">⚠️</span>
+                                    <h3>نقاط نیازمند تلاش و بهبود (Weaknesses)</h3>
+                                </div>
+                                <div class="sw-card-body">
+                                    @if (!string.IsNullOrWhiteSpace(selectedReport.GetWeekness))
+                                    {
+                                        <p class="sw-text">@selectedReport.GetWeekness</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="sw-list">
+                                            @foreach (var weakLesson in currentLessons.Where(l => l.Percent < 25 || l.FalseCount >= 3).OrderBy(l => l.Percent))
+                                            {
+                                                <li>
+                                                    <strong>درس @weakLesson.Name:</strong>
+                                                    درصد کسب‌شده <strong>@weakLesson.Percent.ToString("F1")%</strong> با @weakLesson.FalseCount پاسخ غلط لزوم تست‌زنی آموزشی بیشتر و کنترل نمره منفی در آزمون بعدی را نشان می‌دهد.
+                                                </li>
+                                            }
+                                            @if (!currentLessons.Any(l => l.Percent < 25 || l.FalseCount >= 3))
+                                            {
+                                                <li>تمرکز بر افزایش سرعت تست‌زنی و تبدیل پاسخ‌های نزده به صحیح.</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        @* کادر امضاء *@
+                        <div class="report-signatures-strip mt-6">
+                            <div class="sign-block">
+                                <span>امضاء داوطلب:</span>
+                                <div class="sign-dot-line"></div>
+                            </div>
+                            <div class="sign-block">
+                                <span>امضاء اولیای دانش‌آموز:</span>
+                                <div class="sign-dot-line"></div>
+                            </div>
+                            <div class="sign-block">
+                                <span>مهر و امضاء مشاور تحصیلی:</span>
+                                <div class="sign-dot-line"></div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? codeMeli { get; set; }
+
+    private bool isLoading = true;
+    private string searchNationalCode = string.Empty;
+    private string targetNationalCode = string.Empty;
+    private List<Report_students> reportsList = new();
+    private Report_students? selectedReport;
+    private Report_students? firstReport => reportsList.FirstOrDefault();
+
+    private int activeTab = 0; // 0=Result, 1=StatusCharts, 2=ProgressChart, 3=AnswerSheet, 4=StWe, 5=FullPrint
+
+    private List<LessonReportItem> currentLessons = new();
+    private List<QuestionAnswerItem> currentAnswers = new();
+    private int maxAnswerSheetQuestions = 300;
+
+    private double MaxTaraz => reportsList.Any() ? reportsList.Max(r => r.Total_Taraz) : 0;
+    private double AvgTaraz => reportsList.Any() ? reportsList.Average(r => r.Total_Taraz) : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+
+        targetNationalCode = !string.IsNullOrWhiteSpace(codeMeli)
+            ? codeMeli.Trim()
+            : (UserProfileState.CurrentUser?.code_meli?.Trim() ?? string.Empty);
+
+        searchNationalCode = targetNationalCode;
+
+        if (!string.IsNullOrEmpty(targetNationalCode))
+        {
+            await LoadReportsAsync(targetNationalCode);
+        }
+        else
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchReports(searchNationalCode);
+        }
+    }
+
+    private async Task SearchReports(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return;
+        targetNationalCode = code.Trim();
+        await LoadReportsAsync(targetNationalCode);
+    }
+
+    private async Task LoadReportsAsync(string nationalCode)
+    {
+        isLoading = true;
+        selectedReport = null;
+        try
+        {
+            var result = await _httpClient.GetFromJsonAsync<List<Report_students>>($"api/Report_students/all/{nationalCode}");
+            if (result != null && result.Any())
+            {
+                reportsList = result.OrderBy(r => r.ID).ToList();
+                SelectReport(reportsList.Last()); // پیش‌فرض آخرین آزمون انتخاب می‌شود
+            }
+            else
+            {
+                reportsList = new();
+                snackBar.Add($"هیچ کارنامه‌ای برای کد ملی {nationalCode} یافت نشد.", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading reports: {ex.Message}");
+            snackBar.Add("خطا در بارگذاری کارنامه‌ها از دیتابیس.", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SelectReport(Report_students rep)
+    {
+        selectedReport = rep;
+        currentLessons = ExtractLessons(rep);
+        currentAnswers = ParseAnswerSheet(rep.KeySheet, rep.AnswerSheet, maxAnswerSheetQuestions);
+    }
+
+    private void SetMaxQuestions(int count)
+    {
+        maxAnswerSheetQuestions = count;
+        if (selectedReport != null)
+        {
+            currentAnswers = ParseAnswerSheet(selectedReport.KeySheet, selectedReport.AnswerSheet, maxAnswerSheetQuestions);
+            StateHasChanged();
+        }
+    }
+
+    private string GetStudentName()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedReport?.Student_FullName))
+            return selectedReport.Student_FullName;
+        if (!string.IsNullOrWhiteSpace(firstReport?.Student_FullName))
+            return firstReport.Student_FullName;
+        if (!string.IsNullOrWhiteSpace(UserProfileState.CurrentUser?.fname))
+            return UserProfileState.CurrentUser.fname;
+        return "دانش‌آموز گرامی";
+    }
+
+    private string FormatDate(DateTime dt)
+    {
+        if (dt == default || dt.Year < 2000)
+            return "مرحله اخیر";
+        return dt.ToString("yyyy/MM/dd");
+    }
+
+    private double CalcStatusMarkerRight()
+    {
+        if (selectedReport == null) return 50;
+        // تراز معمول بین ۲۰۰۰ تا ۸۰۰۰
+        double t = selectedReport.Total_Taraz;
+        if (t <= 0) t = selectedReport.Total_Percent * 80;
+        double norm = (t - 2500.0) / (7500.0 - 2500.0) * 100.0;
+        return Math.Clamp(100.0 - norm, 4.0, 96.0); // معکوس جهت RTL
+    }
+
+    private string GetTotalStatusTitle()
+    {
+        if (selectedReport == null) return "متوسط";
+        double t = selectedReport.Total_Taraz;
+        if (t >= 6500) return "عالی";
+        if (t >= 5800) return "خیلی خوب";
+        if (t >= 5000) return "خوب";
+        if (t >= 4200) return "متوسط";
+        if (t >= 3500) return "ضعیف";
+        return "بسیار ضعیف";
+    }
+
+    private string GetTotalStatusClass()
+    {
+        if (selectedReport == null) return "text-primary";
+        double t = selectedReport.Total_Taraz;
+        if (t >= 5800) return "text-success font-weight-bold";
+        if (t >= 4500) return "text-primary font-weight-bold";
+        return "text-danger font-weight-bold";
+    }
+
+    private async Task PrintReport()
+    {
+        activeTab = 5; // نمای کامل چاپی فعال شود
+        StateHasChanged();
+        await Task.Delay(150);
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    // ==========================================
+    // رندرهای اختصاصی گرافیک و نمودارها
+    // ==========================================
+
+    private RenderFragment RenderTarazLineChart() => __builder =>
+    {
+        if (!reportsList.Any()) return;
+
+        double minT = Math.Max(0, reportsList.Min(r => r.Total_Taraz) - 500);
+        double maxT = reportsList.Max(r => r.Total_Taraz) + 500;
+        if (maxT <= minT) maxT = minT + 2000;
+
+        int count = reportsList.Count;
+        double svgWidth = 850;
+        double svgHeight = 240;
+        double padLeft = 80, padRight = 50, padTop = 30, padBottom = 50;
+
+        double plotWidth = svgWidth - padLeft - padRight;
+        double plotHeight = svgHeight - padTop - padBottom;
+
+        var points = new List<(double X, double Y, Report_students Rep)>();
+        for (int i = 0; i < count; i++)
+        {
+            var rep = reportsList[i];
+            double x = count > 1 ? (svgWidth - padRight) - (i * (plotWidth / (count - 1))) : padLeft + plotWidth / 2;
+            double norm = (rep.Total_Taraz - minT) / (maxT - minT);
+            double y = padTop + plotHeight - (norm * plotHeight);
+            points.Add((x, y, rep));
+        }
+
+        string polylinePoints = string.Join(" ", points.OrderBy(p => p.X).Select(p => $"{p.X:F1},{p.Y:F1}"));
+
+        <div class="taraz-chart-wrapper">
+            <svg viewBox="0 0 @svgWidth @svgHeight" class="taraz-svg-chart">
+                <defs>
+                    <linearGradient id="tarazLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#1565c0" />
+                        <stop offset="50%" stop-color="#0288d1" />
+                        <stop offset="100%" stop-color="#2e7d32" />
+                    </linearGradient>
+                </defs>
+
+                <!-- خطوط افقی شبکه -->
+                @for (int g = 0; g <= 4; g++)
+                {
+                    double gridNorm = g / 4.0;
+                    double gridY = padTop + plotHeight - (gridNorm * plotHeight);
+                    double gridVal = minT + (gridNorm * (maxT - minT));
+                    <line x1="@padLeft" y1="@gridY" x2="@(svgWidth - padRight)" y2="@gridY" stroke="#e2e8f0" stroke-dasharray="4" />
+                    @((MarkupString)$"<text x='{padLeft - 10}' y='{gridY + 4}' text-anchor='end' font-size='11' fill='#64748b'>{gridVal:F0}</text>")
+                }
+
+                @if (points.Count > 1)
+                {
+                    <polyline points="@polylinePoints" fill="none" stroke="url(#tarazLineGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                }
+
+                @foreach (var pt in points)
+                {
+                    bool isCur = selectedReport?.ID == pt.Rep.ID;
+                    <circle cx="@pt.X" cy="@pt.Y" r="@(isCur ? 9 : 7)" fill="@(isCur ? "#ff6929" : "#ffffff")" stroke="#1565c0" stroke-width="3" style="cursor: pointer;" @onclick="() => SelectReport(pt.Rep)" />
+                    <circle cx="@pt.X" cy="@pt.Y" r="3" fill="@(isCur ? "#ffffff" : "#1565c0")" />
+
+                    @((MarkupString)$"<text x='{pt.X}' y='{pt.Y - 12}' text-anchor='middle' font-size='12' font-weight='bold' fill='#0d47a1'>{pt.Rep.Total_Taraz:F0}</text>")
+
+                    string label = string.IsNullOrWhiteSpace(pt.Rep.ExamName) ? "مرحله " + pt.Rep.ID : pt.Rep.ExamName;
+                    @((MarkupString)$"<text x='{pt.X}' y='{svgHeight - 15}' text-anchor='middle' font-size='11' fill='#334155'>{label}</text>")
+                }
+            </svg>
+        </div>
+    };
+
+    private RenderFragment RenderLessonsBarChart() => __builder =>
+    {
+        <div class="lessons-bars-container">
+            @foreach (var l in currentLessons)
+            {
+                <div class="lesson-bar-item">
+                    <div class="lesson-bar-header">
+                        <span class="bar-lesson-name">@l.Name</span>
+                        <div class="bar-scores">
+                            <span class="student-score">داوطلب: <strong>@l.Percent.ToString("F1")%</strong></span>
+                            <span class="avg-score">میانگین: @l.PercentAvg.ToString("F1")%</span>
+                            <span class="max-score">بالاترین: @l.PercentMax.ToString("F1")%</span>
+                        </div>
+                    </div>
+
+                    <div class="dual-bars-track">
+                        <!-- میله درصد داوطلب -->
+                        <div class="student-bar-fill @(l.Percent >= 50 ? "bg-success" : (l.Percent >= 25 ? "bg-primary" : "bg-danger"))" style="width: @Math.Max(3, Math.Min(100, l.Percent))%;">
+                            <span class="bar-inner-text">@l.Percent.ToString("F0")%</span>
+                        </div>
+                        <!-- میله میانگین کل -->
+                        <div class="avg-bar-fill" style="width: @Math.Max(3, Math.Min(100, l.PercentAvg))%;"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    private static List<LessonReportItem> ExtractLessons(Report_students r)
+    {
+        var list = new List<LessonReportItem>();
+
+        void Check(int idx, string? name, float pct, float avg, float max, float min, float tr, float fl, float blk, float trz, float mxtrz, float rSch, float rAr, float rTot, string? st)
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                list.Add(new LessonReportItem
+                {
+                    LessonIndex = idx,
+                    Name = name.Trim(),
+                    Percent = pct,
+                    PercentAvg = avg,
+                    PercentMax = max,
+                    PercentMin = min,
+                    TrueCount = tr,
+                    FalseCount = fl,
+                    BlankCount = blk,
+                    Taraz = trz,
+                    MaxTaraz = mxtrz,
+                    RankSchool = rSch,
+                    RankArea = rAr,
+                    RankTotal = rTot,
+                    Status = st ?? ""
+                });
+            }
+        }
+
+        Check(1, r.lesson1_Name, r.lesson1_Percent, r.lesson1_PercentAvarage, r.lesson1_PercentMax, r.lesson1_PercentMin, r.lesson1_True, r.lesson1_False, r.lesson1_Blank, r.lesson1_Taraz, r.lesson1_MaxTararz, r.lesson1_RankSchool, r.lesson1_RankArea, r.lesson1_RankTotal, r.lesson1_Status);
+        Check(2, r.lesson2_Name, r.lesson2_Percent, r.lesson2_PercentAvarage, r.lesson2_PercentMax, r.lesson2_PercentMin, r.lesson2_True, r.lesson2_False, r.lesson2_Blank, r.lesson2_Taraz, r.lesson2_MaxTararz, r.lesson2_RankSchool, r.lesson2_RankArea, r.lesson2_RankTotal, r.lesson2_Status);
+        Check(3, r.lesson3_Name, r.lesson3_Percent, r.lesson3_PercentAvarage, r.lesson3_PercentMax, r.lesson3_PercentMin, r.lesson3_True, r.lesson3_False, r.lesson3_Blank, r.lesson3_Taraz, r.lesson3_MaxTararz, r.lesson3_RankSchool, r.lesson3_RankArea, r.lesson3_RankTotal, r.lesson3_Status);
+        Check(4, r.lesson4_Name, r.lesson4_Percent, r.lesson4_PercentAvarage, r.lesson4_PercentMax, r.lesson4_PercentMin, r.lesson4_True, r.lesson4_False, r.lesson4_Blank, r.lesson4_Taraz, r.lesson4_MaxTararz, r.lesson4_RankSchool, r.lesson4_RankArea, r.lesson4_RankTotal, r.lesson4_Status);
+        Check(5, r.lesson5_Name, r.lesson5_Percent, r.lesson5_PercentAvarage, r.lesson5_PercentMax, r.lesson5_PercentMin, r.lesson5_True, r.lesson5_False, r.lesson5_Blank, r.lesson5_Taraz, r.lesson5_MaxTararz, r.lesson5_RankSchool, r.lesson5_RankArea, r.lesson5_RankTotal, r.lesson5_Status);
+        Check(6, r.lesson6_Name, r.lesson6_Percent, r.lesson6_PercentAvarage, r.lesson6_PercentMax, r.lesson6_PercentMin, r.lesson6_True, r.lesson6_False, r.lesson6_Blank, r.lesson6_Taraz, r.lesson6_MaxTararz, r.lesson6_RankSchool, r.lesson6_RankArea, r.lesson6_RankTotal, r.lesson6_Status);
+        Check(7, r.lesson7_Name, r.lesson7_Percent, r.lesson7_PercentAvarage, r.lesson7_PercentMax, r.lesson7_PercentMin, r.lesson7_True, r.lesson7_False, r.lesson7_Blank, r.lesson7_Taraz, r.lesson7_MaxTararz, r.lesson7_RankSchool, r.lesson7_RankArea, r.lesson7_RankTotal, r.lesson7_Status);
+        Check(8, r.lesson8_Name, r.lesson8_Percent, r.lesson8_PercentAvarage, r.lesson8_PercentMax, r.lesson8_PercentMin, r.lesson8_True, r.lesson8_False, r.lesson8_Blank, r.lesson8_Taraz, r.lesson8_MaxTararz, r.lesson8_RankSchool, r.lesson8_RankArea, r.lesson8_RankTotal, r.lesson8_Status);
+        Check(9, r.lesson9_Name, r.lesson9_Percent, r.lesson9_PercentAvarage, r.lesson9_PercentMax, r.lesson9_PercentMin, r.lesson9_True, r.lesson9_False, r.lesson9_Blank, r.lesson9_Taraz, r.lesson9_MaxTararz, r.lesson9_RankSchool, r.lesson9_RankArea, r.lesson9_RankTotal, r.lesson9_Status);
+        Check(10, r.lesson10_Name, r.lesson10_Percent, r.lesson10_PercentAvarage, r.lesson10_PercentMax, r.lesson10_PercentMin, r.lesson10_True, r.lesson10_False, r.lesson10_Blank, r.lesson10_Taraz, r.lesson10_MaxTararz, r.lesson10_RankSchool, r.lesson10_RankArea, r.lesson10_RankTotal, r.lesson10_Status);
+        Check(11, r.lesson11_Name, r.lesson11_Percent, r.lesson11_PercentAvarage, r.lesson11_PercentMax, r.lesson11_PercentMin, r.lesson11_True, r.lesson11_False, r.lesson11_Blank, r.lesson11_Taraz, r.lesson11_MaxTararz, r.lesson11_RankSchool, r.lesson11_RankArea, r.lesson11_RankTotal, r.lesson11_Status);
+        Check(12, r.lesson12_Name, r.lesson12_Percent, r.lesson12_PercentAvarage, r.lesson12_PercentMax, r.lesson12_PercentMin, r.lesson12_True, r.lesson12_False, r.lesson12_Blank, r.lesson12_Taraz, r.lesson12_MaxTararz, r.lesson12_RankSchool, r.lesson12_RankArea, r.lesson12_RankTotal, r.lesson12_Status);
+        Check(13, r.lesson13_Name, r.lesson13_Percent, r.lesson13_PercentAvarage, r.lesson13_PercentMax, r.lesson13_PercentMin, r.lesson13_True, r.lesson13_False, r.lesson13_Blank, r.lesson13_Taraz, r.lesson13_MaxTararz, r.lesson13_RankSchool, r.lesson13_RankArea, r.lesson13_RankTotal, r.lesson13_Status);
+        Check(14, r.lesson14_Name, r.lesson14_Percent, r.lesson14_PercentAvarage, r.lesson14_PercentMax, r.lesson14_PercentMin, r.lesson14_True, r.lesson14_False, r.lesson14_Blank, r.lesson14_Taraz, r.lesson14_MaxTararz, r.lesson14_RankSchool, r.lesson14_RankArea, r.lesson14_RankTotal, r.lesson14_Status);
+
+        return list;
+    }
+
+    private static List<QuestionAnswerItem> ParseAnswerSheet(string? keySheet, string? answerSheet, int maxQuestions = 300)
+    {
+        var list = new List<QuestionAnswerItem>();
+        if (string.IsNullOrWhiteSpace(keySheet) && string.IsNullOrWhiteSpace(answerSheet)) return list;
+
+        string keys = (keySheet ?? "").Trim();
+        string answers = (answerSheet ?? "").Trim();
+        int rawCount = Math.Max(keys.Length, answers.Length);
+        if (rawCount == 0) return list;
+
+        // سقف حداکثر ۳۰۰ سوال به صورت پیش‌فرض (یا مقدار انتخابی کاربر)
+        int count = maxQuestions > 0 ? Math.Min(rawCount, maxQuestions) : rawCount;
+
+        for (int i = 0; i < count; i++)
+        {
+            char kChar = (i < keys.Length) ? keys[i] : '0';
+            int keyVal = int.TryParse(kChar.ToString(), out int kv) ? kv : 0;
+
+            char aChar = (i < answers.Length) ? answers[i] : '0';
+            int ansVal = int.TryParse(aChar.ToString(), out int av) ? av : 0;
+
+            list.Add(new QuestionAnswerItem
+            {
+                QuestionNumber = i + 1,
+                CorrectKey = keyVal,
+                StudentChoice = ansVal
+            });
+        }
+
+        return list;
+    }
+
+    public class LessonReportItem
+    {
+        public int LessonIndex { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public float Percent { get; set; }
+        public float PercentAvg { get; set; }
+        public float PercentMax { get; set; }
+        public float PercentMin { get; set; }
+        public float TrueCount { get; set; }
+        public float FalseCount { get; set; }
+        public float BlankCount { get; set; }
+        public float TotalQuestions => TrueCount + FalseCount + BlankCount;
+        public float Taraz { get; set; }
+        public float MaxTaraz { get; set; }
+        public float RankSchool { get; set; }
+        public float RankArea { get; set; }
+        public float RankTotal { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class QuestionAnswerItem
+    {
+        public int QuestionNumber { get; set; }
+        public int CorrectKey { get; set; }
+        public int StudentChoice { get; set; }
+        public bool IsCorrect => StudentChoice == CorrectKey && StudentChoice > 0;
+        public bool IsBlank => StudentChoice <= 0;
+        public bool IsWrong => StudentChoice > 0 && StudentChoice != CorrectKey;
+    }
+}
+
+<style>
+    .student-reports-page {
+        direction: rtl;
+        font-family: Sahel, Vazir, 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    /* نوار آواتار */
+    .avatar-img-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #1976d2;
+    }
+    .avatar-placeholder-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #1565c0;
+        color: white;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .stat-pill {
+        padding: 8px 16px;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 120px;
+    }
+    .bg-light-blue { background: #e3f2fd; }
+    .bg-light-green { background: #e8f5e9; }
+    .bg-light-purple { background: #f3e5f5; }
+
+    .stat-pill-title { font-size: 11px; color: #546e7a; margin-bottom: 2px; }
+    .stat-pill-val { font-size: 18px; font-weight: 900; }
+
+    /* سربرگ کارنامه انتخابی */
+    .detailed-report-container {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .report-header-banner {
+        background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    .report-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+    }
+    .header-logo-section { display: flex; align-items: center; gap: 12px; }
+    .header-main-title { font-size: 22px; font-weight: 900; margin: 0; }
+    .header-sub-title { font-size: 12px; opacity: 0.85; }
+
+    .header-exam-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    .exam-name-pill {
+        background: rgba(255,255,255,0.2);
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .exam-date-text { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+
+    /* مشخصات فردی دانش‌آموز */
+    .report-student-profile-strip {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 16px;
+    }
+    .student-print-photo {
+        width: 75px;
+        height: 75px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid white;
+    }
+    .student-photo-placeholder {
+        width: 75px;
+        height: 75px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .student-details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px 20px;
+        flex-grow: 1;
+        font-size: 13px;
+    }
+    .meta-label { opacity: 0.8; margin-left: 6px; }
+    .meta-value { font-weight: 500; }
+
+    /* نمرات کل آزمون */
+    .overall-scores-strip {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+    }
+    .overall-score-cell {
+        background: white;
+        color: #1e293b;
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .cell-label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
+    .cell-number { font-size: 20px; font-weight: 900; color: #0d47a1; }
+    .cell-sub { font-size: 10px; color: #94a3b8; }
+
+    .answers-count-row {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 11px;
+    }
+    .ans-badge.correct { color: #2e7d32; font-weight: bold; }
+    .ans-badge.wrong { color: #c62828; font-weight: bold; }
+    .ans-badge.blank { color: #757575; }
+
+    /* نوار گرادیان ۶ وضعیتی (schoolfarsBar) */
+    .status-gradient-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 18px;
+    }
+    .badge-status-title {
+        font-size: 12px;
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: white;
+        border: 1px solid #cbd5e1;
+    }
+    #schoolfarsBar {
+        background-image: linear-gradient(to left, #2e7d32, #4caf50, #ffeb3b, #ff9800, #f44336, #b71c1c);
+        text-align: center;
+        height: 28px;
+        border-radius: 14px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        display: flex;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+    .statusZone {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 11px;
+        color: white;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        border-left: 1px solid rgba(255,255,255,0.25);
+    }
+    .statusZone:last-child { border-left: none; }
+
+    .marker-track {
+        position: relative;
+        height: 32px;
+        margin-top: 4px;
+    }
+    .status-marker-pointer {
+        position: absolute;
+        top: 0;
+        transform: translateX(50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transition: right 1s ease-in-out;
+    }
+    .marker-arrow-down {
+        color: #d32f2f;
+        font-size: 14px;
+        line-height: 1;
+    }
+    .marker-taraz-badge {
+        background: #0d47a1;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 1px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+    }
+
+    /* کارت‌های بخش‌های گزارش */
+    .report-section-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px;
+        background: white;
+    }
+    .section-card-header {
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+    }
+    .section-card-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    /* جدول دروس با استایل دقیق schoolfars */
+    #divLessons {
+        width: 100%;
+        overflow-x: auto;
+    }
+    .schoolfars-table {
+        min-width: 920px;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .rowHead th {
+        background-color: #0275d8;
+        color: white;
+        padding: 10px 6px;
+        text-align: center;
+        font-weight: bold;
+        border: 1px solid #025aa5;
+    }
+    .schoolfars-table td {
+        padding: 8px 6px;
+        border: 1px solid #d7d7d7;
+        text-align: center;
+    }
+    .ev { background-color: #fff8e1; } /* حتی: زرد لایت */
+    .odd { background-color: #e3f2fd; } /* فرد: آبی لایت */
+    .rowFooter td {
+        background-color: #37474f;
+        color: white;
+        padding: 10px 6px;
+        font-weight: bold;
+    }
+    .lesson-title-cell { font-size: 13px; }
+    .lesson-tag {
+        font-size: 10px;
+        background: rgba(0,0,0,0.08);
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-right: 6px;
+        font-weight: normal;
+    }
+
+    .col0 { width: 40px; }
+    .col1 { width: 180px; }
+    .col2 { width: 55px; }
+    .col3 { width: 50px; }
+    .col4 { width: 50px; }
+    .col5 { width: 50px; }
+    .col6 { width: 70px; }
+    .col7 { width: 85px; }
+    .col8 { width: 85px; }
+    .col9 { width: 85px; }
+    .col10 { width: 85px; }
+    .col11 { width: 85px; }
+
+    /* نمودار میله‌ای مقایسه دروس */
+    .lessons-bars-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .lesson-bar-item {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 14px;
+    }
+    .lesson-bar-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    .bar-lesson-name { font-weight: bold; color: #1e293b; }
+    .bar-scores { display: flex; gap: 15px; font-size: 11px; }
+    .student-score { color: #0d47a1; font-weight: bold; }
+    .avg-score { color: #64748b; }
+    .max-score { color: #0288d1; }
+
+    .dual-bars-track {
+        position: relative;
+        height: 20px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .student-bar-fill {
+        height: 100%;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-left: 8px;
+    }
+    .bar-inner-text { font-size: 11px; font-weight: bold; color: white; }
+    .avg-bar-fill {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        border-left: 3px solid #f59e0b;
+        opacity: 0.9;
+    }
+
+    /* نمودار خطی تراز */
+    .taraz-chart-wrapper {
+        width: 100%;
+        overflow-x: auto;
+    }
+    .taraz-svg-chart {
+        width: 100%;
+        min-width: 650px;
+        height: auto;
+    }
+
+    /* پاسخ‌برگ چهارگزینه‌ای (AnswerSheet) */
+    .containerAnswer {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px 16px;
+    }
+    .colAnswer {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 6px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .rank {
+        font-weight: 900;
+        font-size: 12px;
+        color: #334155;
+        min-width: 25px;
+    }
+    .options-bubbles-row {
+        display: flex;
+        gap: 5px;
+    }
+    .aBubble {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1.5px solid #cbd5e1;
+        background: white;
+        color: #475569;
+        font-size: 11px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .answerPicked {
+        background: #006400 !important; /* سبز پررنگ schoolfars */
+        border-color: #006400 !important;
+        color: white !important;
+    }
+    .wrongPicked {
+        background: #8b0000 !important; /* قرمز تیره schoolfars */
+        border-color: #8b0000 !important;
+        color: white !important;
+    }
+    .correctKeyOnly {
+        border-color: #006400 !important;
+        border-width: 2px !important;
+        background: #e8f5e9 !important;
+        color: #006400 !important;
+    }
+
+    .legend-chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .bg-ans-ok { background: #e8f5e9; color: #006400; border: 1px solid #006400; }
+    .bg-ans-err { background: #ffebee; color: #8b0000; border: 1px solid #8b0000; }
+    .bg-ans-key { background: #f1f5f9; color: #006400; border: 1px dashed #006400; }
+    .bg-ans-blank { background: #f8fafc; color: #64748b; border: 1px solid #cbd5e1; }
+
+    /* نقاط قوت و ضعف (StWe) */
+    .strengths-weaknesses-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+    .sw-card {
+        border-radius: 10px;
+        padding: 16px;
+        border: 1px solid #e0e0e0;
+    }
+    .strength-card {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+    .weakness-card {
+        background: #fef2f2;
+        border-color: #fecaca;
+    }
+    .sw-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+        padding-bottom: 6px;
+    }
+    .sw-card-header h3 {
+        font-size: 14px;
+        font-weight: bold;
+        margin: 0;
+    }
+    .strength-card h3 { color: #166534; }
+    .weakness-card h3 { color: #991b1b; }
+
+    .sw-list {
+        padding-right: 18px;
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.9;
+        color: #334155;
+    }
+    .sw-text {
+        font-size: 13px;
+        line-height: 2;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    /* امضاها */
+    .report-signatures-strip {
+        display: flex;
+        justify-content: space-around;
+        padding-top: 30px;
+        border-top: 1px dashed #cbd5e1;
+    }
+    .sign-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 12px;
+        color: #475569;
+        font-weight: bold;
+    }
+    .sign-dot-line {
+        width: 140px;
+        height: 1px;
+        border-bottom: 1px dashed #94a3b8;
+        margin-top: 35px;
+    }
+
+    /* پرینت مرورگر جهت صدور فایل PDF */
+    @@media print {
+        body, html {
+            background-color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .no-print, .mud-appbar, .mud-drawer, nav, header {
+            display: none !important;
+        }
+
+        .detailed-report-container {
+            box-shadow: none !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+        }
+
+        .containerAnswer {
+            grid-template-columns: repeat(5, 1fr) !important;
+        }
+
+        @@page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+    }
+
+    @@media (max-width: 900px) {
+        .student-details-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .overall-scores-strip {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .containerAnswer {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .strengths-weaknesses-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

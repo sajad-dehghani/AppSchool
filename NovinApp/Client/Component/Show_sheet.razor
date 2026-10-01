@@ -1,0 +1,58 @@
+﻿<MudGrid Class="pa-2">
+    <MudItem xs="12">
+
+        <MudText Class="m-2" Typo="Typo.h6" Align="Align.Right">انتخاب صفحه</MudText>
+        <MudDivider DividerType="DividerType.Middle" Class="my-6" />
+        <MudText Class="m-2" Typo="Typo.body1" Align="Align.Right">فایل با موفقیت بارگذاری شد. لطفا صفحه فایل اکسل را انتخاب کنید:</MudText>
+
+
+    </MudItem>
+    <MudItem xs="12">
+        <MudDialog>
+            <DialogContent>
+
+                <MudSelect Dense="true" T="string" Label="نام صفحه" Variant="Variant.Outlined" @bind-Value=@sel_sheet>
+                    @foreach (var item in sheets)
+                    {
+                        <MudSelectItem Value="@item" />
+                    }
+                </MudSelect>
+
+            </DialogContent>
+            <DialogActions>
+                <MudButton Color="Color.Success" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Done" Class="mt-2" OnClick="ok">تأیید</MudButton>
+                <MudSpacer />
+                <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Cancel" Class="mt-2" OnClick="notok">انصراف</MudButton>
+
+            </DialogActions>
+        </MudDialog>
+    </MudItem>
+</MudGrid>
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public string mytext { get; set; }
+    public string sel_sheet { get; set; }
+    void ok()
+    {
+    //    Cls_global.select_sheet = sel_sheet;
+        MudDialog.Close(DialogResult.Ok(true));
+
+    }
+    void notok()
+    {
+    //    Cls_global.select_sheet = "";
+        MudDialog.Close(DialogResult.Ok(false));
+
+    }
+    List<string> sheets = new List<string>();
+    protected override void OnInitialized()
+    {
+
+        string[] s = mytext.Split("|");
+        foreach (var item in s)
+        {
+            sheets.Add(item);
+        }
+    }
+
+}

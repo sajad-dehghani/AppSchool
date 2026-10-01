@@ -1,0 +1,504 @@
+@page "/Maping"
+@inject HttpClient _httpClient
+@inject IJSRuntime JS
+@inject NavigationManager navigation
+@inject MudBlazor.ISnackbar snackBar
+@using System.Globalization
+@using System.IO
+@using System.Runtime.CompilerServices
+@using ExcelDataReader
+@using Microsoft.AspNetCore.Components.Forms
+@using NovinApp.Shared
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6 mb-8">
+    <MudCard Elevation="4" Class="rounded-lg">
+        <MudCardHeader>
+            <CardHeaderAvatar>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Large" />
+                </MudAvatar>
+            </CardHeaderAvatar>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Class="fw-bold">بارگذاری و ثبت سریع کارنامه دانش‌آموزان</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">فایل اکسل (.xlsx یا .xls) را انتخاب نموده و بر روی دکمه ثبت اطلاعات کلیک کنید.</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudGrid>
+                <!-- منطقه انتخاب فایل -->
+                <MudItem xs="12">
+                    <div class="file-upload-dropzone p-6 d-flex flex-column align-center justify-center border-dashed rounded-lg"
+                         style="border: 2px dashed var(--mud-palette-primary); background-color: var(--mud-palette-background-grey); cursor: pointer;">
+                        
+                        <label for="fileinput" class="w-100 d-flex flex-column align-center justify-center" style="cursor: pointer;">
+                            @if (selectedFile == null)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold text-center">برای انتخاب فایل اکسل اینجا کلیک کنید</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-1">فرمت‌های مجاز: xlsx, xls, csv (حداکثر ۱۰۰ مگابایت)</MudText>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                                <MudText Typo="Typo.subtitle1" Color="Color.Success" Class="fw-bold text-center">
+                                    فایل انتخاب شد: @selectedFile.Name
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-1">
+                                    حجم فایل: @FormatFileSize(selectedFile.Size)
+                                </MudText>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-2">
+                                    تغییر فایل انتخاب‌شده
+                                </MudButton>
+                            }
+                            <InputFile id="fileinput" OnChange="OnFileSelected" class="d-none" accept=".xlsx,.xls,.csv" />
+                        </label>
+                    </div>
+                </MudItem>
+
+                <!-- دکمه‌های عملیات -->
+                <MudItem xs="12" Class="d-flex align-center gap-3 mt-2">
+                    <MudButton Disabled="@(isProcessing || selectedFile == null)"
+                               Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               Size="Size.Large"
+                               StartIcon="@(isProcessing ? null : Icons.Material.Filled.Bolt)"
+                               OnClick="UploadExcelAsync">
+                        @if (isProcessing)
+                        {
+                            <MudProgressCircular Class="ms-n1 me-2" Size="Size.Small" Indeterminate="true" />
+                            <span>در حال پردازش...</span>
+                        }
+                        else
+                        {
+                            <span>ثبت یکجای اطلاعات در دیتابیس</span>
+                        }
+                    </MudButton>
+
+                    @if (selectedFile != null && !isProcessing)
+                    {
+                        <MudButton Color="Color.Default"
+                                   Variant="Variant.Outlined"
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.Clear"
+                                   OnClick="ResetSelection">
+                            انصراف / پاک کردن
+                        </MudButton>
+                    }
+                </MudItem>
+
+                <!-- نوار پیشرفت و وضعیت -->
+                @if (isProcessing)
+                {
+                    <MudItem xs="12" Class="mt-4">
+                        <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background-color: var(--mud-palette-background-grey);">
+                            <div class="d-flex justify-space-between align-center mb-2">
+                                <MudText Typo="Typo.subtitle2" Class="fw-bold">
+                                    جریان مستقیم بارگذاری و ثبت داده‌ها با موتور SqlBulkCopy
+                                </MudText>
+                                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="fw-bold">
+                                    در حال استریم به سرور...
+                                </MudText>
+                            </div>
+
+                            <MudProgressLinear Color="Color.Primary"
+                                               Indeterminate="true"
+                                               Rounded="true"
+                                               Size="Size.Large"
+                                               Class="my-2" />
+
+                            <div class="d-flex justify-space-between align-center mt-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @statusMessage
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Primary" Class="fw-bold">
+                                    استریم مستقیم بدون اشغال رم مرورگر
+                                </MudText>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                <!-- بنچ‌مارک و گزارش عملکرد فوق‌العاده سریع -->
+                @if (uploadResult != null && uploadResult.Success && !isProcessing)
+                {
+                    <MudItem xs="12" Class="mt-3">
+                        <div class="pa-4 rounded-lg" style="background-color: rgba(46, 125, 50, 0.05); border: 2px solid #2e7d32;">
+                            <div class="d-flex align-center gap-2 mb-3">
+                                <MudIcon Icon="@Icons.Material.Filled.Speed" Color="Color.Success" Size="Size.Large" />
+                                <div>
+                                    <MudText Typo="Typo.h6" Color="Color.Success" Class="fw-bold">
+                                        عملیات بارگذاری میلیونی با حداکثر سرعت انجام شد!
+                                    </MudText>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-md-4">
+                                    <div class="pa-3 rounded-lg text-center" style="background-color: white; border: 1px solid #e0e0e0;">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">تعداد کل رکوردهای ثبت‌شده</MudText>
+                                        <MudText Typo="Typo.h5" Color="Color.Primary" Class="fw-bold mt-1">
+                                            @uploadResult.TotalRows.ToString("N0")
+                                        </MudText>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-4">
+                                    <div class="pa-3 rounded-lg text-center" style="background-color: white; border: 1px solid #e0e0e0;">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">مدت زمان کل عملیات</MudText>
+                                        <MudText Typo="Typo.h5" Color="Color.Info" Class="fw-bold mt-1">
+                                            @uploadResult.ElapsedSeconds.ToString("F2") ثانیه
+                                        </MudText>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-4">
+                                    <div class="pa-3 rounded-lg text-center" style="background-color: white; border: 1px solid #e0e0e0;">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">سرعت درج در دیتابیس</MudText>
+                                        <MudText Typo="Typo.h5" Color="Color.Success" Class="fw-bold mt-1">
+                                            @uploadResult.RowsPerSecond.ToString("N0") رکورد بر ثانیه
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </MudItem>
+                }
+
+                <!-- پیام وضعیت نهایی در صورت خطا -->
+                @if (!string.IsNullOrEmpty(statusMessage) && !isProcessing && (uploadResult == null || !uploadResult.Success))
+                {
+                    <MudItem xs="12" Class="mt-2">
+                        <MudAlert Severity="@alertSeverity" Variant="Variant.Filled" Class="rounded-lg">
+                            @statusMessage
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- بخش مدیریت و حذف دسته‌ای فایل‌های آپلود شده -->
+    <MudCard Elevation="4" Class="rounded-lg mt-6">
+        <MudCardHeader>
+            <CardHeaderAvatar>
+                <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Large" />
+                </MudAvatar>
+            </CardHeaderAvatar>
+            <CardHeaderContent>
+                <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                    <div>
+                        <MudText Typo="Typo.h5" Class="fw-bold text-danger">مدیریت و حذف دسته‌ای فایل‌های آپلودشده</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">حذف یکجای رکوردهای آخرین فایل آپلودشده (Rollback) یا حذف دسته‌ای آزمون‌ها</MudText>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <MudButton Color="Color.Error"
+                                   Variant="Variant.Filled"
+                                   Size="Size.Medium"
+                                   StartIcon="@Icons.Material.Filled.History"
+                                   Disabled="@(isDeleting || !uploadBatches.Any())"
+                                   OnClick="ConfirmDeleteLastUpload">
+                            @if (isDeleting)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ms-n1 me-2" />
+                                <span>در حال حذف...</span>
+                            }
+                            else
+                            {
+                                <span>حذف فوری آخرین آپلود</span>
+                            }
+                        </MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                       Color="Color.Primary"
+                                       OnClick="LoadUploadBatchesAsync" />
+                    </div>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            @if (isLoadingBatches)
+            {
+                <div class="d-flex justify-center align-center pa-6">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Medium" />
+                    <span class="mr-3">در حال بارگذاری لیست دسته‌ها...</span>
+                </div>
+            }
+            else if (!uploadBatches.Any())
+            {
+                <MudAlert Severity="Severity.Info" Class="rounded-lg">
+                    در حال حاضر هیچ رکوردی در جدول کارنامه‌ها وجود ندارد.
+                </MudAlert>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="direction: rtl; width: 100%;">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>مشخصات فایل / شناسه بسته</th>
+                                <th>نام آزمون</th>
+                                <th>تاریخ و زمان ثبت</th>
+                                <th>تعداد رکوردها</th>
+                                <th class="text-center" style="width: 140px;">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < uploadBatches.Count; i++)
+                            {
+                                int idx = i;
+                                var b = uploadBatches[idx];
+                                bool isLatest = idx == 0;
+                                <tr class="@(isLatest ? "table-warning" : "")">
+                                    <td class="fw-bold">
+                                        @(idx + 1)
+                                        @if (isLatest)
+                                        {
+                                            <span class="badge bg-danger ms-1" style="font-size: 0.7rem;">آخرین آپلود</span>
+                                        }
+                                    </td>
+                                    <td class="fw-bold">@b.FileName</td>
+                                    <td>@(string.IsNullOrWhiteSpace(b.ExamName) ? "عمومی" : b.ExamName)</td>
+                                    <td>@b.UploadTime.ToString("yyyy/MM/dd HH:mm:ss")</td>
+                                    <td>
+                                        <span class="badge bg-primary text-white" style="font-size: 0.85rem;">
+                                            @b.RecordCount.ToString("N0") رکورد
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <MudButton Color="Color.Error"
+                                                   Variant="Variant.Outlined"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.Delete"
+                                                   Disabled="@isDeleting"
+                                                   OnClick="@(() => ConfirmDeleteBatch(b))">
+                                            حذف این بسته
+                                        </MudButton>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+<style>
+    .border-dashed {
+        border-style: dashed !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .file-upload-dropzone:hover {
+        background-color: var(--mud-palette-action-hover) !important;
+    }
+</style>
+
+@code {
+    [CascadingParameter] Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    private IBrowserFile? selectedFile;
+    private bool isProcessing = false;
+    private string statusMessage = "";
+    private Severity alertSeverity = Severity.Info;
+    private ExcelBulkUploadResult? uploadResult;
+
+    private List<UploadBatchSummary> uploadBatches = new();
+    private bool isLoadingBatches = false;
+    private bool isDeleting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationState;
+        if (!authState.User.Identity?.IsAuthenticated ?? true)
+        {
+            navigation.NavigateTo("/login");
+        }
+
+        await LoadUploadBatchesAsync();
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        statusMessage = "";
+        uploadResult = null;
+    }
+
+    private void ResetSelection()
+    {
+        selectedFile = null;
+        statusMessage = "";
+        uploadResult = null;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+
+    private async Task UploadExcelAsync()
+    {
+        if (selectedFile == null)
+        {
+            snackBar.Add("لطفاً ابتدا یک فایل اکسل انتخاب کنید!", Severity.Warning);
+            return;
+        }
+
+        isProcessing = true;
+        uploadResult = null;
+        statusMessage = "در حال ارسال مستقیم جریان فایل به سرور و درج در پایگاه داده...";
+        alertSeverity = Severity.Info;
+        StateHasChanged();
+
+        try
+        {
+            // استریم مستقیم فایل از مرورگر به سرور با بافر بهینه و بدون اشغال حافظه RAM در مرورگر (WASM)
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 524_288_000));
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            content.Add(streamContent, "file", selectedFile.Name);
+
+            var response = await _httpClient.PostAsync("api/Report_students/upload-excel-stream", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string rawError = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var errorResult = System.Text.Json.JsonSerializer.Deserialize<ExcelBulkUploadResult>(rawError, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    throw new Exception(errorResult?.ErrorMessage ?? rawError);
+                }
+                catch (Exception jsonEx) when (jsonEx is not Exception && jsonEx is not System.Text.Json.JsonException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    throw new Exception(rawError);
+                }
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ExcelBulkUploadResult>();
+            if (result != null && result.Success)
+            {
+                uploadResult = result;
+                statusMessage = result.Message;
+                alertSeverity = Severity.Success;
+                snackBar.Add(result.Message, Severity.Success);
+                await LoadUploadBatchesAsync();
+            }
+            else
+            {
+                throw new Exception(result?.ErrorMessage ?? "خطای نامشخص در ثبت اطلاعات اکسل");
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"خطا در بارگذاری اطلاعات: {ex.Message}";
+            alertSeverity = Severity.Error;
+            snackBar.Add(statusMessage, Severity.Error);
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUploadBatchesAsync()
+    {
+        isLoadingBatches = true;
+        try
+        {
+            var res = await _httpClient.GetFromJsonAsync<List<UploadBatchSummary>>("api/Report_students/upload-batches");
+            uploadBatches = res ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching batches: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingBatches = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ConfirmDeleteLastUpload()
+    {
+        if (!uploadBatches.Any())
+        {
+            snackBar.Add("هیچ رکوردی برای حذف در پایگاه داده وجود ندارد.", Severity.Warning);
+            return;
+        }
+
+        var latest = uploadBatches.First();
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"هشدار: آیا مطمئن هستید که می‌خواهید تمام رکوردهای آخرین فایل آپلودشده ({latest.FileName} با {latest.RecordCount:N0} رکورد) را حذف نمایید؟\n\nاین عملیات برگشت‌ناپذیر است.");
+        if (!confirmed) return;
+
+        isDeleting = true;
+        StateHasChanged();
+        try
+        {
+            var response = await _httpClient.DeleteAsync("api/Report_students/delete-last-upload");
+            var result = await response.Content.ReadFromJsonAsync<DeleteBatchResult>();
+            if (result != null && result.Success)
+            {
+                snackBar.Add(result.Message, Severity.Success);
+                await LoadUploadBatchesAsync();
+            }
+            else
+            {
+                snackBar.Add(result?.ErrorMessage ?? "خطا در حذف آخرین فایل.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در ارتباط با سرور: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ConfirmDeleteBatch(UploadBatchSummary batch)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"آیا از حذف تمام {batch.RecordCount:N0} رکورد مربوط به دسته «{batch.FileName}» در تاریخ {batch.UploadTime:yyyy/MM/dd HH:mm:ss} اطمینان دارید؟");
+        if (!confirmed) return;
+
+        isDeleting = true;
+        StateHasChanged();
+        try
+        {
+            string timeParam = Uri.EscapeDataString(batch.UploadTime.ToString("o"));
+            var response = await _httpClient.DeleteAsync($"api/Report_students/delete-batch?uploadTimeStr={timeParam}");
+            var result = await response.Content.ReadFromJsonAsync<DeleteBatchResult>();
+            if (result != null && result.Success)
+            {
+                snackBar.Add(result.Message, Severity.Success);
+                await LoadUploadBatchesAsync();
+            }
+            else
+            {
+                snackBar.Add(result?.ErrorMessage ?? "خطا در حذف دسته انتخابی.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در ارتباط با سرور: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+}

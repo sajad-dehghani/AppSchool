@@ -1,0 +1,46 @@
+﻿
+
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem>
+                <h5 class="text-primary mud-text-align-center">
+                    <MudImage Src="/img/animation/Qoustion.gif" Width="100" Height="100" />
+                </h5>
+
+            </MudItem>
+            <MudItem>
+
+                <MudText Align="Align.Right">@mytext</MudText>
+            </MudItem>
+        </MudGrid>
+
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Success" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Done" Class="mt-2" OnClick="yes">بله</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Cancel" Class="mt-2" OnClick="no">خیر</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+
+@code {
+    private DialogOptions dialogOptions = new() { Position = DialogPosition.Center, CloseOnEscapeKey = true, NoHeader = false, BackdropClick = true };
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public string mytext { get; set; }
+    void yes()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+
+    }
+    void no() => MudDialog.Close(DialogResult.Cancel());
+    protected override async Task OnInitializedAsync()
+    {
+
+        MudDialog.SetOptionsAsync(dialogOptions);
+    }
+
+}

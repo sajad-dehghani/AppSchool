@@ -1,0 +1,340 @@
+﻿@page "/Students"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared
+@inject IJSRuntime JsRuntime
+@inject MudBlazor.ISnackbar snackBar
+@inject NavigationManager nav
+@inject IDialogService Dialog
+@inject HttpClient _httpClient
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+<MudPaper Elevation="25" Class="pa-3">
+    <MudText Align="Align.Center" Typo="Typo.h5">لیست دانش آموزان</MudText>
+</MudPaper>
+<MudDivider DividerType="DividerType.Inset" />
+
+<MudGrid Class="mt-1 pa-4">
+    <MudItem xs="12">
+        <MudDataGrid Items="@data_list" T="Student" SelectedItem="@selectedItem"
+                     QuickFilter="@_quickFilter" RowClick="@RowClicked" Hover="true" Dense="@true" Striped="@true" Bordered="@true" RowStyleFunc="@_rowStyleFunc"
+                     Class="cursor-pointer" Hideable="true" FixedHeader="true" Loading="isload">
+
+            <ToolBarContent>
+                <MudToolBar Class="d-flex align-center flex-wrap gap-1">
+
+                    <MudTooltip Text="افزودن دانش آموز جدید" Color="Color.Primary" Placement="Placement.Bottom" Arrow="true">
+                        <MudIconButton OnClick="@(() => Add())"
+                                   Color="Color.Primary"
+                                   Icon="@Icons.Material.Outlined.PersonAdd"
+                                   Size="Size.Small"
+                                   Class="ml-1"/>                    
+
+                    </MudTooltip>
+
+                    <MudTooltip Text="ویرایش سطر انتخاب شده" Color="Color.Warning" Placement="Placement.Bottom" Arrow="true">
+                        <MudIconButton OnClick="@(() => Edit())"
+                                       Icon="@Icons.Material.Outlined.Edit"
+                                       Color="Color.Warning"
+                                       Disabled="@(selectedRowNumber == -1)" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="حذف سطر انتخاب شده" Color="Color.Error" Placement="Placement.Bottom" Arrow="true">
+                        <MudIconButton OnClick="@(() => Delete())"
+                                       Icon="@Icons.Material.Outlined.DeleteOutline"
+                                       Color="Color.Error"
+                                       Disabled="@(selectedRowNumber == -1)" />
+                    </MudTooltip>
+
+                    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+
+                    <MudTooltip Text="چاپ گزارش" Color="Color.Secondary" Placement="Placement.Bottom" Arrow="true">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Print" Color="Color.Secondary" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="تازه‌سازی اطلاعات" Color="Color.Success" Placement="Placement.Bottom" Arrow="true">
+                        <MudIconButton OnClick="@(() => Btn_Refresh())"
+                                       Icon="@Icons.Material.Outlined.Refresh"
+                                       Color="Color.Success" />
+                    </MudTooltip>
+
+
+                </MudToolBar>
+                <MudSpacer />
+
+                <MudTextField @bind-Value="_searchString"
+                              Placeholder="جستجوی نام یا کد ملی..."
+                              Adornment="Adornment.Start"
+                              Immediate="true"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Class="mt-0 search-box"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true" />
+            </ToolBarContent>
+
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Typo="Typo.body1" Class="pa-4">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2" />
+                    <br />
+                    اطلاعاتی یافت نشد
+                    <br />
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Outlined.Refresh"
+                               OnClick="@(() => Btn_Refresh())"
+                               Class="mt-2">
+                        تازه‌سازی اطلاعات
+                    </MudButton>
+                </MudText>
+            </NoRecordsContent>
+            <Columns>
+                <TemplateColumn Title="ردیف"
+                                Sortable="false"
+                                Filterable="false">
+                    <CellTemplate>
+                        @{
+                            var list = filtered_list.ToList();
+                            var idx = list.IndexOf(context.Item) + 1;
+                        }
+                        <MudText Typo="Typo.body2">@idx</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+
+                <TemplateColumn Title="عکس" Sortable="false" Filterable="false">
+                    <CellTemplate>
+                        @if (!string.IsNullOrEmpty(context.Item.pic))
+                        {
+                            <MudImage Src="@context.Item.pic" Class="rounded-circle" Elevation="5" Width="60" Height="60" />
+                        }
+                        else
+                        {
+                            <MudImage Src="img/no_pic.jpg" Class="rounded-circle" Elevation="5" Width="60" Height="60" />
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.fname" Title="نام و نام خانوادگی" />
+                <PropertyColumn Property="x => x.code_meli" Title="کد ملی" />
+                <PropertyColumn Property="x => x.mobile" Title="شماره تماس" />
+                <PropertyColumn Property="x => x.pass" Title="کلمه عبور" />
+                <TemplateColumn Title="مشاور" Sortable="true" Filterable="true">
+                    <CellTemplate>
+                        <MudChip T="string"
+                                 Text="@context.Item.Moshaver"
+                                 Variant="Variant.Outlined"
+                                 Color="@GetRoleColor(context.Item.Rool)"
+                                 Size="Size.Small" />
+                    </CellTemplate>
+                </TemplateColumn>
+
+                <TemplateColumn Title="وضعیت" Sortable="true" Filterable="true">
+                    <CellTemplate>
+                        @if (context.Item.active == true)
+                        {
+                            <MudChip T="string"
+                                     Text="فعال"
+                                     Variant="Variant.Outlined"
+                                     Color="Color.Success"
+                                     Size="Size.Small"
+                                     Icon="@Icons.Material.Filled.CheckCircle" />
+                        }
+                        else
+                        {
+                            <MudChip T="string"
+                                     Text="غیرفعال"
+                                     Variant="Variant.Outlined"
+                                     Color="Color.Error"
+                                     Size="Size.Small"
+                                     Icon="@Icons.Material.Filled.Cancel" />
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+@*                 <TemplateColumn Title="عملیات" Sortable="false" Filterable="false">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Settings" Color="Color.Info" />
+                    </CellTemplate>
+                </TemplateColumn> *@
+            </Columns>
+            <PagerContent>
+                @if (filtered_list != null && filtered_list.Any())
+                {
+                    <MudDataGridPager T="Student"
+                                      PageSizeOptions="new int[]{15, 100}"
+                                      RowsPerPageString="تعداد سطر در هر صفحه"
+                                      InfoFormat="نمایش {first_item} تا {last_item} از مجموع {all_items}" />
+                }
+            </PagerContent>
+        </MudDataGrid>
+    </MudItem>
+</MudGrid>
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    .ltr {
+        direction: ltr;
+    }
+
+    .fw-bold {
+        font-weight: bold;
+    }
+
+    .search-box {
+        min-width: 250px;
+    }
+</style>
+@code {
+    private IEnumerable<Student> data_list = new List<Student>();
+    private IEnumerable<Student> filtered_list = new List<Student>();
+    private string _searchString = "";
+    private int selectedRowNumber = -1;
+    private int lastRowNumber = -1;
+    private Student selectedItem = null;
+    bool isload = false;
+    protected override async Task OnInitializedAsync()
+    {
+        await Btn_Refresh();
+    }
+
+    async Task Btn_Refresh()
+    {
+        try
+        {
+            isload = true;
+            data_list = await _httpClient.GetFromJsonAsync<List<Student>>("api/User/students") ?? new List<Student>();
+            filtered_list = data_list;
+            isload = false;
+
+        }
+        catch
+        {
+            isload = false;
+
+            snackBar.Add("خطا در دریافت اطلاعات کاربران", Severity.Error);
+        }
+        await InvokeAsync(() => StateHasChanged());
+    }
+
+    // رنگ چیپ بر اساس نقش
+    Color GetRoleColor(string role)
+    {
+        return role switch
+        {
+            "مدیر" => Color.Error,
+            "مشاور" => Color.Warning,
+            "دانش آموز" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    void Add()
+    {
+        Cls_global.select_row_titr = "Students";
+
+        nav.NavigateTo("/Users");
+    }
+
+    void Edit()
+    {
+        if (data_list.Count() >= 1)
+        {
+            if (selectedRowNumber != -1)
+            {
+                Cls_global.select_row_id = selectedRowNumber;
+                Cls_global.IsEdit = true;
+                Cls_global.select_row_titr = "Students";
+
+                nav.NavigateTo($"/Users");
+            }
+        }
+    }
+
+    private Func<Student, int, string> _rowStyleFunc => (x, i) =>
+    {
+        if (selectedRowNumber == lastRowNumber)
+        {
+            lastRowNumber = selectedRowNumber;
+            return "";
+        }
+
+        if (x.Id == selectedRowNumber)
+            return "background-color: rgba(var(--mud-palette-primary-rgb), 0.12); border-left: 3px solid var(--mud-palette-primary);";
+
+        return "";
+    };
+
+    void RowClicked(DataGridRowClickEventArgs<Student> args)
+    {
+        if (selectedRowNumber == args.Item.Id)
+        {
+            selectedRowNumber = -1;
+        }
+        else
+        {
+            selectedRowNumber = args.Item.Id;
+
+        }
+        //  Idrow = args.Item.rowId;
+    }
+    private Func<Student, bool> _quickFilter => x =>
+{
+    if (string.IsNullOrWhiteSpace(_searchString))
+        return true;
+
+    if (x.code_meli.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+        return true;
+    if (x.fname.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+        return true;
+
+
+    return false;
+};
+
+    async Task Delete()
+    {
+
+        if (data_list.Count() >= 1)
+        {
+            if (selectedRowNumber != -1)
+            {
+
+                if (await OpenDialog("آیا از حذف سطر انتخابی اطمینان دارید ؟").ConfigureAwait(false))
+                {
+                    var respon = await _httpClient.DeleteAsync($"api/User/{selectedRowNumber}");
+
+                    if (respon.IsSuccessStatusCode)
+                    {
+                        selectedRowNumber = -1;
+                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                        snackBar.Add("اطلاعات مورد نظر با موفقیت حذف شد", Severity.Info);
+                    }
+                    else
+                    {
+                        selectedRowNumber = -1;
+                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                        snackBar.Add("حذف اطلاعات با خطا مواجه شد", Severity.Error);
+                    }
+                    await Btn_Refresh();
+                }
+            }
+        }
+    }
+
+    public async Task<bool> OpenDialog(string txt)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", txt);
+        var dialog = await Dialog.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+        return !result.Canceled;
+    }
+
+    void GoToBack()
+    {
+        nav.NavigateTo("/Home");
+    }
+}

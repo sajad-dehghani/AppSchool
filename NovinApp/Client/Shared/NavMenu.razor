@@ -1,0 +1,101 @@
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject UserProfileStateService UserProfileState
+
+<MudPaper Elevation="0" Class="sidebar-root">
+
+    @if (UserProfileState.IsLoaded)
+    {
+        <MudPaper Class="profile-card" Elevation="3">
+            <!-- Profile Card -->
+            <MudText Align="Align.Center">
+                @if (@UserProfileState.CurrentUser?.pic != null)
+                {
+                    <MudImage ObjectFit=ObjectFit.Cover Elevation="10" Class="rounded-circle mt-2" Src=@UserProfileState.CurrentUser?.pic Height="100" Width="100" />
+                }
+                else
+                {
+
+                    <MudImage Src="img/no_pic.jpg" Class="rounded-circle" Elevation="5" Width=100 Height="100" />
+                }
+            </MudText>
+            <MudText Typo="Typo.subtitle1" Class="mt-2">
+                @UserProfileState.CurrentUser?.fname
+            </MudText>
+
+            <MudGrid>
+
+                <MudText Typo="Typo.subtitle1" Class="mt-5">
+                    <MudChip Class="mt-2" T="string" Variant="Variant.Filled" Color="Color.Primary"> @UserProfileState.CurrentUser?.code_meli</MudChip>
+
+                </MudText>
+                <MudText Typo="Typo.subtitle1" Class="mt-5">
+                    <MudChip Class="mt-2" T="string" Variant="Variant.Filled" Color="@(MudBlazor.Color.Tertiary)">پایه نهم</MudChip>
+                </MudText>
+            </MudGrid>
+
+
+        </MudPaper>
+
+        <MudPaper Square="true" Class="pa-1" Elevation="3">
+        <!-- Navigation -->
+        <MudNavMenu Class="nav-menu">
+
+            <MudNavLink Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary" Href="/Home" Match="NavLinkMatch.All">
+                داشبورد
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.Group" IconColor="Color.Primary" Href="/Moshaver">
+                مشاوران
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.School" IconColor="Color.Primary" Href="/Students">
+                دانش آموزان
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.EventNote" IconColor="Color.Success" Href="/StudyPlan">
+                برنامه‌ریزی کنکور
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">
+                آزمون‌های روانشناسی
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.PieChart" IconColor="Color.Info" Href="/StudentReports">
+                کارنامه‌های تحلیلی آزمون
+            </MudNavLink>
+            @if (UserProfileState.CurrentUser?.Rool?.Contains("مشاور") == true || UserProfileState.CurrentUser?.Rool?.Contains("مدیر") == true)
+            {
+                <MudNavLink Icon="@Icons.Material.Filled.AssignmentInd" IconColor="Color.Info" Href="/CounselorReports">
+                    کارتابل مشاور (ارزیابی‌ها)
+                </MudNavLink>
+            }
+            <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Primary" Href="/maping">
+                کارنامه و تحلیل نتایج
+            </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.FormatListNumberedRtl" IconColor="Color.Primary" Href="/QuestionsList">
+                    بانک سوالات
+                </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.AttachMoney" IconColor="Color.Primary" Href="/purchase">
+                امور مالی و تراکنش‌ها
+            </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Settings" IconColor="Color.Primary" Href="/maping">
+                تنظیمات
+            </MudNavLink>
+
+
+        </MudNavMenu>
+        </MudPaper>
+    }
+    </MudPaper>
+
+@code {
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserProfileState.OnChange += StateHasChanged;
+
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+    }
+
+    public void Dispose()
+    {
+        UserProfileState.OnChange -= StateHasChanged;
+    }
+}
