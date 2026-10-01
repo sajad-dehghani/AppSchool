@@ -1,0 +1,143 @@
+@page "/StudentPanel"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Common
+@using NovinApp.Shared.DTOs.Students
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize(Roles = UserRoles.Student)]
+
+<div style="background: linear-gradient(135deg, #4A148C 0%, #6A1B9A 60%, #AB47BC 100%); border-radius: 16px; padding: 20px 24px;" class="mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.School" Class="ml-2 align-middle" />
+                پنل دانش‌آموزی من
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity:0.9;">
+                مشاهده اطلاعات پرونده تحصیلی و ارتباط با مشاور
+            </MudText>
+        </div>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Surface" Size="Size.Small"
+                       OnClick="OnInitializedAsync" Title="تازه‌سازی اطلاعات" />
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center my-8">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </div>
+}
+else if (myProfile != null)
+{
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudPaper Elevation="3" Class="pa-5 rounded-lg" Style="border-top: 5px solid #7B1FA2;">
+                <MudText Typo="Typo.h6" Class="font-weight-bold mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Class="ml-2" />
+                    اطلاعات پرونده من
+                </MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">نام کامل</MudText>
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">@myProfile.FullName</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">کد ملی</MudText>
+                        <MudText Typo="Typo.body1">@myProfile.NationalCode</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">نام پدر</MudText>
+                        <MudText Typo="Typo.body1">@(myProfile.FatherName ?? "---")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">تلفن</MudText>
+                        <MudText Typo="Typo.body1">@(myProfile.PhoneNumber ?? "---")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">پایه تحصیلی</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                            @(myProfile.GradeLevel ?? "---")
+                        </MudChip>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">رشته تحصیلی</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                            @(myProfile.FieldOfStudy ?? "---")
+                        </MudChip>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudPaper Elevation="3" Class="pa-5 rounded-lg mb-4" Style="border-top: 5px solid #1976D2;">
+                        <MudText Typo="Typo.h6" Class="font-weight-bold mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="ml-2" />
+                            مدرسه من
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(myProfile.SchoolName))
+                        {
+                            <MudText Typo="Typo.body1" Class="font-weight-bold text-primary">@myProfile.SchoolName</MudText>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="rounded-lg">هنوز به مدرسه‌ای اختصاص داده نشده‌اید.</MudAlert>
+                        }
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudPaper Elevation="3" Class="pa-5 rounded-lg" Style="border-top: 5px solid #2E7D32;">
+                        <MudText Typo="Typo.h6" Class="font-weight-bold mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.SupervisorAccount" Class="ml-2" />
+                            مشاور تحصیلی من
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(myProfile.ConsultantName))
+                        {
+                            <div class="d-flex align-center gap-3">
+                                <MudAvatar Color="Color.Success" Size="Size.Large">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                </MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.body1" Class="font-weight-bold text-success">@myProfile.ConsultantName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">مشاور تحصیلی شما</MudText>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" Class="rounded-lg">هنوز مشاوری برای شما تعیین نشده است.</MudAlert>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudAlert Severity="Severity.Warning" Class="rounded-lg">خطا در بارگذاری اطلاعات پرونده.</MudAlert>
+}
+
+@code {
+    private StudentDto? myProfile;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<StudentDto>>>("api/students");
+            if (res?.Success == true && res.Data?.Count > 0) myProfile = res.Data.First();
+        }
+        catch (Exception ex) { snackBar.Add($"خطا: {ex.Message}", Severity.Error); }
+        finally { isLoading = false; }
+    }
+}

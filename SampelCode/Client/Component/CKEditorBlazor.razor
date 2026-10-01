@@ -1,0 +1,92 @@
+﻿@inherits InputTextArea
+@inject IJSRuntime JSRuntime
+
+<textarea @attributes="AdditionalAttributes" readonly="@isread"
+          id="@Id"
+          class="@CssClass"
+          value="@CurrentValue"
+          style="display:none"></textarea>
+
+@code {
+    string _id;
+    private DotNetObjectReference<CKEditorBlazor>? dotNetRef;
+    private bool isInitialized = false;
+
+    [Parameter]
+    public string Id
+    {
+        get => _id ?? $"CKEditor_{uid}";
+        set => _id = value;
+    }
+
+    [Parameter]
+    public string UrlToPostImage { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool isread { get; set; } = false;
+
+    readonly string uid = Guid.NewGuid().ToString().ToLower().Replace("-", "");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            // مقدار جاری (از دیتابیس) را به JS ارسال کنید
+            var currentValue = CurrentValue ?? string.Empty;
+
+            await JSRuntime.InvokeVoidAsync("CKEditorInterop.init",
+                Id,
+                UrlToPostImage,
+                dotNetRef,
+                currentValue); // ارسال مقدار به JS
+
+            isInitialized = true;
+        }
+
+        // اگر مقدار از بیرون تغییر کرد و ادیتور مقداردهی شده بود
+        if (isInitialized && !string.Equals(CurrentValue, await GetEditorData()))
+        {
+            await SetEditorData(CurrentValue);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task<string> GetEditorData()
+    {
+        return await JSRuntime.InvokeAsync<string>("CKEditorInterop.getData", Id);
+    }
+
+    private async Task SetEditorData(string value)
+    {
+        await JSRuntime.InvokeVoidAsync("CKEditorInterop.setData", Id, value ?? string.Empty);
+    }
+
+    [JSInvokable]
+    public async Task EditorDataChanged(string data)
+    {
+        if (CurrentValue != data)
+        {
+            CurrentValue = data;
+            await ValueChanged.InvokeAsync(data);
+            StateHasChanged();
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            dotNetRef?.Dispose();
+        }
+
+        if (!string.IsNullOrEmpty(Id))
+        {
+            JSRuntime.InvokeVoidAsync("CKEditorInterop.destroy", Id);
+        }
+
+        base.Dispose(disposing);
+    }
+}

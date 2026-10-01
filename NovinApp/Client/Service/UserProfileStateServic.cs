@@ -1,7 +1,8 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 using NovinApp.Shared;
+using NovinApp.Shared.Constants;
 
 namespace NovinApp.Client.Service
 {
@@ -21,6 +22,18 @@ namespace NovinApp.Client.Service
         {
             _authProvider = authProvider;
             _httpClient = httpClient;
+        }
+
+        // Helper properties for role checks
+        public bool IsSystemAdmin => IsRoleMatch(UserRoles.SystemAdmin);
+        public bool IsSchoolManager => IsRoleMatch(UserRoles.SchoolManager);
+        public bool IsConsultant => IsRoleMatch(UserRoles.Consultant);
+        public bool IsStudent => IsRoleMatch(UserRoles.Student);
+
+        private bool IsRoleMatch(string role)
+        {
+            if (CurrentUser?.Rool == null) return false;
+            return UserRoles.NormalizeRole(CurrentUser.Rool) == role;
         }
 
         public async Task LoadUserAsync()
@@ -48,8 +61,18 @@ namespace NovinApp.Client.Service
             {
                 CurrentUser = await _httpClient.GetFromJsonAsync<User>($"api/User/{userId}");
 
+                // اگر User از JWT claims بارگذاری نشد، سعی می‌کنیم از claims نقش را بگیریم
                 if (CurrentUser != null)
                 {
+                    // هماهنگ‌سازی نقش از JWT claim با مدل User
+                    if (string.IsNullOrEmpty(CurrentUser.Rool))
+                    {
+                        var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value
+                            ?? user.FindFirst("Role")?.Value;
+                        if (!string.IsNullOrEmpty(roleClaim))
+                            CurrentUser.Rool = roleClaim;
+                    }
+
                     IsLoaded = true;
                     NotifyStateChanged();
                 }
@@ -57,6 +80,32 @@ namespace NovinApp.Client.Service
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading user profile: {ex.Message}");
+
+                // Fallback: Create a minimal user from JWT claims
+                try
+                {
+                    var fullName = user.FindFirst("FullName")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value ?? "";
+                    var nationalCode = user.FindFirst("NationalCode")?.Value ?? "";
+                    var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("Role")?.Value ?? UserRoles.Student;
+
+                    if (!string.IsNullOrEmpty(fullName) || !string.IsNullOrEmpty(nationalCode))
+                    {
+                        CurrentUser = new User
+                        {
+                            Id = int.TryParse(userId, out var id) ? id : 0,
+                            fname = fullName,
+                            code_meli = nationalCode,
+                            Rool = roleClaim,
+                            gender = "نامشخص",
+                            mobile = "",
+                            pass = "",
+                            active = true
+                        };
+                        IsLoaded = true;
+                        NotifyStateChanged();
+                    }
+                }
+                catch { }
             }
         }
 

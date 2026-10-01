@@ -1,0 +1,688 @@
+@page "/Quiz"
+@page "/Quiz/{TestType}"
+@using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
+@using NovinApp.Client.Components
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject PsychologyTestService testService
+@inject UserProfileStateService UserProfileState
+@inject ISnackbar snackBar
+@inject NavigationManager nav
+@inject IJSRuntime JS
+@attribute [Authorize]
+
+
+<div class="no-print">
+    <MudPaper Elevation="3" Class="pa-4 mb-4" Style="border-radius: 12px; background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); color: white;">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+            <div>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Class="ml-2 align-middle" />
+                    @currentReportTitle
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                    پاسخ‌های شما مستقیماً در کارنامه هدایت تحصیلی و انتخاب رشته ثبت و توسط هوش مصنوعی تحلیل می‌گردد.
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Surface" StartIcon="@Icons.Material.Filled.ArrowForward" Href="/Products">
+                بازگشت به آزمون‌ها
+            </MudButton>
+        </div>
+    </MudPaper>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center my-12">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        <MudText Typo="Typo.subtitle1" Class="ms-3">در حال بارگذاری سوالات و بررسی سابقه آزمون...</MudText>
+    </div>
+}
+else if (alreadyTaken && !isFinished)
+{
+    @* پیام اینکه قبلا شرکت کرده‌اید *@
+    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg mb-4">
+        شما قبلاً در این آزمون شرکت کرده‌اید. هر دانش‌آموز تنها یک‌بار مجاز به ثبت پاسخ در هر تست می‌باشد. کارنامه ثبت‌شده شما در زیر نمایش داده می‌شود:
+    </MudAlert>
+}
+
+@if (!isFinished && !alreadyTaken)
+{
+    @* نوار پیشرفت *@
+    <MudPaper Class="pa-4 mb-4 no-print" Elevation="2" Style="border-radius: 12px;">
+        <div class="d-flex justify-space-between align-center mb-2">
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                سوال @(currentIndex + 1) از @questions.Count
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @ProgressPercent.ToString("F0")% تکمیل شده
+            </MudText>
+        </div>
+        <MudProgressLinear Color="Color.Primary" Size="Size.Medium" Value="@ProgressPercent" Rounded="true" />
+    </MudPaper>
+
+    @* کارت سوال فعلی *@
+    @if (currentQuestion != null)
+    {
+        <MudCard Elevation="4" Class="pa-6 no-print" Style="border-radius: 16px; border-right: 6px solid #1976d2;">
+            <MudCardContent>
+                <div class="d-flex align-center gap-2 mb-4">
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
+                        سوال شماره @(currentIndex + 1)
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">
+                        حوزه ارزیابی: @currentQuestion.CategoryName
+                    </MudChip>
+                </div>
+
+                <MudText Typo="Typo.h6" Class="my-4 font-weight-bold" Style="line-height: 2;">
+                    « @currentQuestion.Text »
+                </MudText>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Class="mb-3" Color="Color.Dark">
+                    @(ActiveTestType == PsychologyTestTypes.Gardner ? "میزان انطباق این ویژگی با شما چقدر است؟" : "میزان موافقت یا تمایل شما نسبت به این عبارت چقدر است؟")
+                </MudText>
+
+                @* گزینه‌های پاسخ‌دهی متناسب با آزمون *@
+                @if (ActiveTestType == PsychologyTestTypes.Cattell)
+                {
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="4">
+                            <div class="@GetOptionClass(2)" @onclick="() => SelectScoreAndAdvance(2)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 2 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 2 ? Color.Primary : Color.Default)" Size="Size.Medium" />
+                                <span class="font-weight-bold">موافقم / بله</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <div class="@GetOptionClass(1)" @onclick="() => SelectScoreAndAdvance(1)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 1 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 1 ? Color.Primary : Color.Default)" Size="Size.Medium" />
+                                <span class="font-weight-bold">بینابین / بین این دو</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <div class="@GetOptionClass(0)" @onclick="() => SelectScoreAndAdvance(0)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 0 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 0 ? Color.Primary : Color.Default)" Size="Size.Medium" />
+                                <span class="font-weight-bold">مخالفم / خیر</span>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                }
+                else if (ActiveTestType == PsychologyTestTypes.Gardner)
+                {
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(0)" @onclick="() => SelectScoreAndAdvance(0)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 0 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 0 ? Color.Error : Color.Default)" Size="Size.Medium" />
+                                <span>کاملاً مخالفم (۰)</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(1)" @onclick="() => SelectScoreAndAdvance(1)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 1 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 1 ? Color.Warning : Color.Default)" Size="Size.Medium" />
+                                <span>مخالفم (۱)</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(2)" @onclick="() => SelectScoreAndAdvance(2)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 2 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 2 ? Color.Info : Color.Default)" Size="Size.Medium" />
+                                <span>موافقم (۲)</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(3)" @onclick="() => SelectScoreAndAdvance(3)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 3 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 3 ? Color.Success : Color.Default)" Size="Size.Medium" />
+                                <span>کاملاً موافقم (۳)</span>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                }
+                else
+                {
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6" md="2">
+                            <div class="@GetOptionClass(1)" @onclick="() => SelectScoreAndAdvance(1)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 1 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 1 ? Color.Error : Color.Default)" Size="Size.Medium" />
+                                <span>کاملاً مخالفم</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="2">
+                            <div class="@GetOptionClass(2)" @onclick="() => SelectScoreAndAdvance(2)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 2 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 2 ? Color.Warning : Color.Default)" Size="Size.Medium" />
+                                <span>مخالفم</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(3)" @onclick="() => SelectScoreAndAdvance(3)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 3 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 3 ? Color.Default : Color.Default)" Size="Size.Medium" />
+                                <span>بی‌تفاوت / نظری ندارم</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="2">
+                            <div class="@GetOptionClass(4)" @onclick="() => SelectScoreAndAdvance(4)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 4 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 4 ? Color.Info : Color.Default)" Size="Size.Medium" />
+                                <span>موافقم</span>
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <div class="@GetOptionClass(5)" @onclick="() => SelectScoreAndAdvance(5)">
+                                <MudIcon Icon="@(currentQuestion.SelectedScore == 5 ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                         Color="@(currentQuestion.SelectedScore == 5 ? Color.Success : Color.Default)" Size="Size.Medium" />
+                                <span>کاملاً موافقم</span>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </MudCardContent>
+
+            <MudCardActions Class="d-flex justify-space-between mt-6 pt-3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ArrowForward"
+                           Disabled="@(currentIndex == 0)" OnClick="PrevQuestion">
+                    سوال قبلی
+                </MudButton>
+
+                @if (currentIndex < questions.Count - 1)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowBack"
+                               OnClick="NextQuestion" Size="Size.Large">
+                        سوال بعدی
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.CheckCircle"
+                               OnClick="FinishExam" Size="Size.Large" Disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <MudProgressCircular Class="ms-n1 me-2" Size="Size.Small" Indeterminate="true" />
+                            <span>در حال ذخیره و تحلیل هوش مصنوعی...</span>
+                        }
+                        else
+                        {
+                            <span>ثبت نهایی و صدور کارنامه</span>
+                        }
+                    </MudButton>
+                }
+            </MudCardActions>
+        </MudCard>
+    }
+}
+else if (testReport != null)
+{
+    @if (comprehensiveReport != null)
+    {
+        <MudTabs Elevation="3" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-0" Class="no-print mb-4" Color="Color.Primary" @bind-ActivePanelIndex="selectedReportTab">
+            <MudTabPanel Text="کارنامه جامع و چندصفحه‌ای هدایت تحصیلی (الگوی رسمی PDF)" Icon="@Icons.Material.Filled.PictureAsPdf">
+            </MudTabPanel>
+            <MudTabPanel Text="داشبورد خلاصه و سریع آزمون" Icon="@Icons.Material.Filled.Dashboard">
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (selectedReportTab == 0)
+        {
+            <ComprehensiveReportView Report="@comprehensiveReport" OnBack="@BackToProducts" />
+        }
+        else
+        {
+            @* بخش داشبورد خلاصه *@
+            <div id="printReportSection">
+                <MudGrid>
+                    @* سربرگ گزارش *@
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-6 text-center position-relative" Elevation="4" Style="border-radius: 16px; background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%); color: white;">
+                            <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+                                <MudChip T="string" Color="Color.Surface" Variant="Variant.Filled" Class="text-primary font-weight-bold">
+                                    سامانه جامع هدایت تحصیلی نوین
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Style="opacity: 0.9;">
+                                    تاریخ ارزیابی: @(savedDbResult?.CreatedAt.ToString("yyyy/MM/dd HH:mm") ?? DateTime.Now.ToString("yyyy/MM/dd"))
+                                </MudText>
+                            </div>
+
+                            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" Class="mb-2" />
+                            <MudText Typo="Typo.h4" Class="font-weight-bold">
+                                کارنامه رسمی ارزیابی و هدایت تحصیلی دانش‌آموز
+                            </MudText>
+                            <MudText Typo="Typo.h6" Class="mt-1" Style="opacity: 0.95;">
+                                @testReport.TestTitle
+                            </MudText>
+
+                            @* مشخصات دانش‌آموز *@
+                            <div class="d-flex justify-center gap-4 flex-wrap mt-4 pa-2 rounded-lg" style="background: rgba(255,255,255,0.15);">
+                                <span><strong>نام و نام خانوادگی:</strong> @(savedDbResult?.StudentName ?? UserProfileState.CurrentUser?.fname ?? "دانش‌آموز")</span>
+                                <span>|</span>
+                                <span><strong>کد ملی:</strong> @(savedDbResult?.StudentNationalCode ?? UserProfileState.CurrentUser?.code_meli ?? "---")</span>
+                                <span>|</span>
+                                <span><strong>مشاور مربوطه:</strong> @(UserProfileState.CurrentUser?.Moshaver ?? "واحد مشاوره تحصیلی")</span>
+                            </div>
+
+                            <div class="mt-4">
+                                <MudChip T="string" Size="Size.Large" Color="Color.Warning" Variant="Variant.Filled" Class="font-weight-bold text-dark px-6 py-2" Style="font-size: 1.2rem;">
+                                    شاخص برتر: @testReport.PrimaryCode
+                                </MudChip>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+
+                    @* دکمه چاپ و پرینت PDF *@
+                    <MudItem xs="12" Class="d-flex justify-space-between align-center flex-wrap gap-2 no-print my-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" Size="Size.Large" OnClick="PrintReport">
+                            دریافت / چاپ کارنامه رسمی (PDF)
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ArrowForward" Href="/Products">
+                            بازگشت به آزمون‌ها
+                        </MudButton>
+                    </MudItem>
+
+
+            @* نمودار میله‌ای تفکیکی نمرات ابعاد *@
+            <MudItem xs="12" md="7">
+                <MudCard Elevation="4" Class="h-100" Style="border-radius: 16px;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Primary"><MudIcon Icon="@Icons.Material.Filled.BarChart" /></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">نمودار درصدی سنجش ابعاد آزمون</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">سنجش تفکیکی پتانسیل‌ها و تمایلات</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @foreach (var dim in testReport.Dimensions.OrderByDescending(s => s.Percentage))
+                        {
+                            <div class="mb-4">
+                                <div class="d-flex justify-space-between align-center mb-1">
+                                    <span class="font-weight-bold">
+                                        <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Style="@($"color: {dim.ColorHex}; vertical-align: middle; margin-left: 6px;")" />
+                                        @dim.Title
+                                    </span>
+                                    <span class="font-weight-bold" style="color: @dim.ColorHex">
+                                        @dim.Percentage% (@dim.Score از @dim.MaxScore) - @dim.LevelTitle
+                                    </span>
+                                </div>
+                                <MudProgressLinear Color="Color.Primary" Value="@dim.Percentage"
+                                                   Style="@($"height: 12px; border-radius: 6px; background-color: #f0f0f0; --mud-palette-primary: {dim.ColorHex};")" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">
+                                    @dim.PersianDesc
+                                </MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            @* پیشنهادات تحصیلی و دانشگاهی *@
+            <MudItem xs="12" md="5">
+                <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px; border-top: 5px solid #2e7d32;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Success"><MudIcon Icon="@Icons.Material.Filled.School" /></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">شاخه‌های اولویت‌دار پایه نهم</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">سازگارترین رشته‌های دوره دوم متوسطه</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pt-0">
+                        <MudList T="string" Dense="true">
+                            @foreach (var branch in testReport.HighSchoolBranches)
+                            {
+                                <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@branch</MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudCardContent>
+                </MudCard>
+
+                <MudCard Elevation="4" Style="border-radius: 16px; border-top: 5px solid #1565c0;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Info"><MudIcon Icon="@Icons.Material.Filled.AutoStories" /></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">رشته‌های دانشگاهی متناسب کنکور</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">رشته‌های منطبق بر هوش و شخصیت</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pt-0">
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var major in testReport.UniversityMajors)
+                            {
+                                <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" Icon="@Icons.Material.Filled.Star">
+                                    @major
+                                </MudChip>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            @* بخش نظریه و تحلیل نهایی هوش مصنوعی *@
+            <MudItem xs="12">
+                <MudCard Elevation="4" Style="border-radius: 16px; border-top: 5px solid #7b1fa2; background-color: #faf9ff;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="fw-bold">نظریه و ارزیابی نهایی هوش مصنوعی جهت انتخاب رشته</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">توصیه تحلیلی سیستم هوشمند مشاوره‌ای نوین</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">ثبت شده در پرونده</MudChip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudPaper Class="pa-4 rounded-lg border-solid" Elevation="0" Style="border: 1px solid #d1c4e9; background-color: white; line-height: 2;">
+                            <MudText Typo="Typo.body1" Style="white-space: pre-line;">
+                                @(testReport.AiGuidance ?? savedDbResult?.AiRecommendation ?? "تحلیل هوش مصنوعی در حال به‌روزرسانی است...")
+                            </MudText>
+                        </MudPaper>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            @* مشاغل و چشم‌انداز حرفه‌ای *@
+            <MudItem xs="12">
+                <MudCard Elevation="4" Style="border-radius: 16px;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Dark"><MudIcon Icon="@Icons.Material.Filled.Work" /></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">فرصت‌های شغلی و بازار کار آینده</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">مشاغل متناسب با استعدادهای فردی</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var career in testReport.SuitableCareers)
+                            {
+                                <MudChip T="string" Color="Color.Dark" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Badge">
+                                    @career
+                                </MudChip>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </div>
+    }
+}
+}
+
+
+<style>
+    .option-card {
+        padding: 16px 14px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+        background-color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        user-select: none;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .option-card:hover {
+        border-color: #1976d2;
+        background-color: #f0f7ff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.12);
+    }
+    .option-card-selected {
+        padding: 16px 14px;
+        border: 2px solid #1976d2;
+        background: linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(25, 118, 210, 0.18) 100%);
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        user-select: none;
+        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.2);
+        color: #0d47a1;
+        font-weight: bold;
+    }
+
+    @@media print {
+        .no-print, .mud-appbar, .mud-drawer, header, nav {
+            display: none !important;
+        }
+        body {
+            background-color: white !important;
+            font-size: 12pt;
+        }
+        #printReportSection {
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string? TestType { get; set; }
+    [SupplyParameterFromQuery] public int? studentId { get; set; }
+
+    private string ActiveTestType => string.IsNullOrWhiteSpace(TestType) ? PsychologyTestTypes.Holland : TestType;
+    private List<TestQuestion> questions = new();
+    private int currentIndex = 0;
+    private TestQuestion? currentQuestion;
+    private bool isFinished = false;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool alreadyTaken = false;
+    private string currentReportTitle = "آزمون روانشناسی و استعدادسنجی";
+    private TestAnalysisReport? testReport;
+    private PsychologyTestResult? savedDbResult;
+    private ComprehensiveCareerReport? comprehensiveReport;
+    private int selectedReportTab = 0;
+
+    private double ProgressPercent => questions.Count > 0 ? (double)(currentIndex + 1) / questions.Count * 100 : 0;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+
+        var user = UserProfileState.CurrentUser;
+        int targetUserId = (studentId != null && studentId > 0) ? studentId.Value : (user?.Id ?? 0);
+
+        if (targetUserId > 0)
+        {
+            // بررسی اینکه آیا دانش‌آموز قبلاً در این آزمون شرکت کرده است؟
+            var status = await testService.CheckStatusAsync(targetUserId, ActiveTestType);
+            if (status.hasTaken && status.result != null)
+            {
+                alreadyTaken = true;
+                savedDbResult = status.result;
+                isFinished = true;
+                LoadReportFromDbResult(status.result);
+                isLoading = false;
+                return;
+            }
+        }
+
+        // اگر شرکت نکرده، سوالات آزمون بارگذاری می‌شود
+        questions = testService.GetQuestions(ActiveTestType);
+        if (questions.Any())
+        {
+            currentQuestion = questions[currentIndex];
+            currentReportTitle = ActiveTestType switch
+            {
+                PsychologyTestTypes.Gardner => "آزمون هوش‌های چندگانه گاردنر (۸۰ سوال)",
+                PsychologyTestTypes.NEO => "آزمون پنج عامل بزرگ شخصیت نئو (۶۰ سوال)",
+                PsychologyTestTypes.Cattell => "آزمون ۱۶ عاملی شخصیت کتل (Cattell 16PF)",
+                PsychologyTestTypes.Clifton => "آزمون استعدادیابی و توانمندی‌های کلیفتون (Clifton Strengths)",
+                _ => "آزمون رغبت‌سنجی شغلی و تحصیلی هالند"
+            };
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SelectScoreAndAdvance(int score)
+    {
+        if (currentQuestion == null) return;
+        currentQuestion.SelectedScore = score;
+        StateHasChanged();
+
+        // تاخیر کوتاه برای نمایش انیمیشن انتخاب و اطمینان کاربر
+        await Task.Delay(180);
+
+        if (currentIndex < questions.Count - 1)
+        {
+            currentIndex++;
+            currentQuestion = questions[currentIndex];
+            StateHasChanged();
+        }
+    }
+
+    private string GetOptionClass(int score)
+    {
+        return currentQuestion?.SelectedScore == score ? "option-card-selected" : "option-card";
+    }
+
+    private void NextQuestion()
+    {
+        if (currentIndex < questions.Count - 1)
+        {
+            currentIndex++;
+            currentQuestion = questions[currentIndex];
+        }
+    }
+
+    private void PrevQuestion()
+    {
+        if (currentIndex > 0)
+        {
+            currentIndex--;
+            currentQuestion = questions[currentIndex];
+        }
+    }
+
+    private async Task FinishExam()
+    {
+        isSaving = true;
+        try
+        {
+            // ۱. محاسبه گزارش آزمون
+            testReport = testService.CalculateReport(ActiveTestType, questions);
+
+            var user = UserProfileState.CurrentUser;
+            if (user == null)
+            {
+                snackBar.Add("خطا: اطلاعات کاربری یافت نشد. لطفاً مجدداً وارد شوید.", Severity.Error);
+                return;
+            }
+
+            // ۲. آماده‌سازی مدل جهت ذخیره در دیتابیس
+            var dbModel = new PsychologyTestResult
+            {
+                UserId = user.Id,
+                StudentNationalCode = user.code_meli,
+                StudentName = user.fname,
+                Id_Moshaver = user.Id_Moshaver,
+                TestType = ActiveTestType,
+                TestTitle = testReport.TestTitle,
+                PrimaryScore = testReport.PrimaryCode?.Length > 500 ? testReport.PrimaryCode[..500] : testReport.PrimaryCode,
+                ScoresJson = JsonSerializer.Serialize(testReport.Dimensions),
+                AnalysisText = testReport.SummaryAnalysis,
+                HighSchoolBranchesJson = JsonSerializer.Serialize(testReport.HighSchoolBranches),
+                UniversityMajorsJson = JsonSerializer.Serialize(testReport.UniversityMajors),
+                SuitableCareersJson = JsonSerializer.Serialize(testReport.SuitableCareers),
+                CreatedAt = DateTime.Now
+            };
+
+            // ۳. ذخیره کارنامه در دیتابیس
+            savedDbResult = await testService.SaveResultAsync(dbModel);
+
+            // ۴. دریافت و ذخیره نظریه هوش مصنوعی
+            if (savedDbResult != null)
+            {
+                var aiAdvice = await testService.GenerateAiRecommendationAsync(savedDbResult, user);
+                testReport.AiGuidance = aiAdvice;
+            }
+
+            comprehensiveReport = testService.BuildComprehensiveReport(testReport, user, savedDbResult, user.Moshaver);
+
+            isFinished = true;
+            snackBar.Add("آزمون شما با موفقیت ثبت شد و کارنامه صادر گردید!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در ثبت آزمون: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void LoadReportFromDbResult(PsychologyTestResult r)
+    {
+        try
+        {
+            testReport = new TestAnalysisReport
+            {
+                TestType = r.TestType,
+                TestTitle = r.TestTitle,
+                PrimaryCode = r.PrimaryScore ?? "",
+                SummaryAnalysis = r.AnalysisText,
+                AiGuidance = r.AiRecommendation,
+                Dimensions = !string.IsNullOrEmpty(r.ScoresJson)
+                    ? JsonSerializer.Deserialize<List<TestScoreDimension>>(r.ScoresJson) ?? new()
+                    : new(),
+                HighSchoolBranches = !string.IsNullOrEmpty(r.HighSchoolBranchesJson)
+                    ? JsonSerializer.Deserialize<List<string>>(r.HighSchoolBranchesJson) ?? new()
+                    : new(),
+                UniversityMajors = !string.IsNullOrEmpty(r.UniversityMajorsJson)
+                    ? JsonSerializer.Deserialize<List<string>>(r.UniversityMajorsJson) ?? new()
+                    : new(),
+                SuitableCareers = !string.IsNullOrEmpty(r.SuitableCareersJson)
+                    ? JsonSerializer.Deserialize<List<string>>(r.SuitableCareersJson) ?? new()
+                    : new()
+            };
+
+            comprehensiveReport = testService.BuildComprehensiveReport(testReport, UserProfileState.CurrentUser, r, UserProfileState.CurrentUser?.Moshaver);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deserializing report: {ex.Message}");
+        }
+    }
+
+
+    private void BackToProducts() => nav.NavigateTo("/Products");
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+}
+

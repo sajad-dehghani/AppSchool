@@ -1,0 +1,296 @@
+@page "/StudyPlan"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject UserProfileStateService UserProfileState
+@inject ISnackbar snackBar
+@attribute [Authorize]
+
+<MudPaper Elevation="3" Class="pa-4 mb-4" Style="border-radius: 12px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: white;">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.EventNote" Class="ml-2 align-middle" />
+                سامانه برنامه‌ریزی تحصیلی و ثبت ساعات مطالعه کنکور
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                ثبت روزانه دروس، ساعات مطالعه، تعداد تست‌ها و پایش مستمر روند پیشرفت توسط مشاور تحصیلی
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudChip T="string" Color="Color.Surface" Variant="Variant.Filled" Icon="@Icons.Material.Filled.School" Class="text-success">
+                هدف: کنکور سراسری ۱۴۰۴
+            </MudChip>
+        </div>
+    </div>
+</MudPaper>
+
+@* کارت‌های خلاصه آماری هفته *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="3" Style="border-radius: 12px; border-right: 5px solid #1976d2;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">کل ساعات مطالعه هفته</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-primary">@TotalHours.ToString("F1") ساعت</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">هدف هفتگی: ۴۵ ساعت</MudText>
+                </div>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.AccessTime" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="3" Style="border-radius: 12px; border-right: 5px solid #2e7d32;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تعداد تست‌های حل‌شده</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-success">@TotalTests تست</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">درصد درستی: @AccuracyPercent%</MudText>
+                </div>
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.FactCheck" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="3" Style="border-radius: 12px; border-right: 5px solid #e65100;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تست‌های صحیح / نادرست</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1" Style="color: #e65100;">@TotalCorrect / @TotalWrong</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">نیاز به تحلیل پاسخنامه</MudText>
+                </div>
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="3" Style="border-radius: 12px; border-right: 5px solid #7b1fa2;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">وضعیت بازخورد مشاور</MudText>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mt-1" Style="color: #7b1fa2;">برنامه تایید شد</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">۲ توصیه جدید مشاور</MudText>
+                </div>
+                <MudAvatar Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonPin" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudTabs Elevation="3" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary" Class="pa-2">
+    <MudTabPanel Text="ثبت ساعات مطالعه و تست جدید" Icon="@Icons.Material.Filled.AddCircle">
+        <MudCard Elevation="0">
+            <MudCardContent>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string" Label="نام درس" @bind-Value="newReport.SubjectName" Variant="Variant.Outlined" Required="true">
+                            <MudSelectItem Value="@("زیست‌شناسی")">زیست‌شناسی</MudSelectItem>
+                            <MudSelectItem Value="@("شیمی")">شیمی</MudSelectItem>
+                            <MudSelectItem Value="@("ریاضیات و حسابان")">ریاضیات و حسابان</MudSelectItem>
+                            <MudSelectItem Value="@("فیزیک")">فیزیک</MudSelectItem>
+                            <MudSelectItem Value="@("ادبیات و فارسی")">ادبیات و فارسی</MudSelectItem>
+                            <MudSelectItem Value="@("عربی تخصصی / عمومی")">عربی</MudSelectItem>
+                            <MudSelectItem Value="@("زبان انگلیسی")">زبان انگلیسی</MudSelectItem>
+                            <MudSelectItem Value="@("فلسفه و منطق")">فلسفه و منطق</MudSelectItem>
+                            <MudSelectItem Value="@("اقتصاد و روانشناسی")">اقتصاد و روانشناسی</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudNumericField T="double" Label="ساعت مطالعه (مثلاً ۲.۵)" @bind-Value="newReport.StudyHours" Variant="Variant.Outlined" Min="0.25" Max="16" Step="0.25" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudNumericField T="int" Label="تعداد کل تست‌ها" @bind-Value="newReport.TestCount" Variant="Variant.Outlined" Min="0" Max="500" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudNumericField T="int" Label="تست‌های صحیح" @bind-Value="newReport.CorrectCount" Variant="Variant.Outlined" Min="0" Max="500" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="8">
+                        <MudTextField T="string" Label="مباحث و فصول مطالعه‌شده (مثلاً گوارش زیست، مشتق حسابان)" @bind-Value="newReport.TopicsCovered" Variant="Variant.Outlined" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="int" Label="میزان بازدهی و کیفیت" @bind-Value="newReport.QualityRating" Variant="Variant.Outlined">
+                            <MudSelectItem Value="5">⭐⭐⭐⭐⭐ عالی و با تمرکز کامل</MudSelectItem>
+                            <MudSelectItem Value="4">⭐⭐⭐⭐ خوب و موثر</MudSelectItem>
+                            <MudSelectItem Value="3">⭐⭐⭐ متوسط</MudSelectItem>
+                            <MudSelectItem Value="2">⭐⭐ ضعیف / حواس‌پرتی داشتم</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="یادداشت داوطلب برای مشاور (مشکلات در حل تست‌ها یا زمان‌بندی)" @bind-Value="newReport.StudentNote" Variant="Variant.Outlined" Lines="2" />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions Class="d-flex justify-end pt-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" Size="Size.Large" OnClick="SaveReport">
+                    ثبت در کارنامه هفتگی
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudTabPanel>
+
+    <MudTabPanel Text="گزارش مطالعاتی هفته" Icon="@Icons.Material.Filled.TableChart">
+        <MudTable Items="@studyLogs" Hover="true" Striped="true" Dense="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>تاریخ</MudTh>
+                <MudTh>نام درس</MudTh>
+                <MudTh>مبحث</MudTh>
+                <MudTh>ساعت مطالعه</MudTh>
+                <MudTh>تعداد تست</MudTh>
+                <MudTh>صحیح / غلط</MudTh>
+                <MudTh>کیفیت</MudTh>
+                <MudTh>بازخورد مشاور</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="تاریخ">@context.ReportDate.ToString("yyyy/MM/dd")</MudTd>
+                <MudTd DataLabel="نام درس">
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">@context.SubjectName</MudChip>
+                </MudTd>
+                <MudTd DataLabel="مبحث">@context.TopicsCovered</MudTd>
+                <MudTd DataLabel="ساعت مطالعه"><b>@context.StudyHours</b> ساعت</MudTd>
+                <MudTd DataLabel="تعداد تست">@context.TestCount</MudTd>
+                <MudTd DataLabel="صحیح / غلط">
+                    <span class="text-success font-weight-bold">@context.CorrectCount</span> /
+                    <span class="text-danger font-weight-bold">@context.WrongCount</span>
+                </MudTd>
+                <MudTd DataLabel="کیفیت">
+                    @string.Concat(Enumerable.Repeat("⭐", context.QualityRating))
+                </MudTd>
+                <MudTd DataLabel="بازخورد مشاور">
+                    @if (!string.IsNullOrEmpty(context.CounselorNote))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Small" Class="align-middle" />
+                            @context.CounselorNote
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Default">در انتظار بازخورد</MudText>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="توصیه‌ها و پیام‌های مشاور تحصیلی" Icon="@Icons.Material.Filled.SupportAgent">
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Primary"><MudIcon Icon="@Icons.Material.Filled.Person" /></MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">مشاور تحصیلی: استاد رضایی</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">برنامه راهبردی کنکور تجربی - هفته جاری</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body2" Style="line-height: 1.9;">
+                            ۱. روی زیست‌شناسی فصل ۲ (گوارش و جذب) تعداد تست‌های زمان‌دار را حداقل ۳۰ درصد افزایش دهید. <br />
+                            ۲. در درس شیمی، تست‌های محاسباتی استوکیومتری نیاز به مرور تکنیک‌های ضرب سریع دارد. <br />
+                            ۳. خواب شبانه منظم (حداقل ۷ ساعت) برای ثبات حافظه الزامی است. حتماً تست‌های غلط هر روز را در دفتر خودآموز یادداشت کنید.
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="2" Style="border-radius: 12px; background-color: #f9fbe7;">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2" Color="Color.Success">
+                            <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Class="align-middle ml-1" />
+                            نکته مشاوره‌ای امروز
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="line-height: 1.8; color: #33691e;">
+                            «کنکور یک ماراتن است نه دوی سرعت. پیوستگی و حتی مطالعه ۴ ساعت باکیفیت در روز، بهتر از ۱۲ ساعت مطالعه پراکنده و پرنوسان در هفته است.»
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private StudyDailyReport newReport = new()
+    {
+        SubjectName = "زیست‌شناسی",
+        StudyHours = 2.5,
+        TestCount = 50,
+        CorrectCount = 42,
+        WrongCount = 8,
+        TopicsCovered = "زیست دهم - فصل گوارش",
+        QualityRating = 4
+    };
+
+    private List<StudyDailyReport> studyLogs = new()
+    {
+        new StudyDailyReport { Id = 1, ReportDate = DateTime.Today.AddDays(-2), SubjectName = "زیست‌شناسی", StudyHours = 3.5, TestCount = 70, CorrectCount = 58, WrongCount = 12, TopicsCovered = "گردش مواد و قلب", QualityRating = 5, CounselorNote = "عالی، دقت در تست‌های قیددار بالاست" },
+        new StudyDailyReport { Id = 2, ReportDate = DateTime.Today.AddDays(-2), SubjectName = "شیمی", StudyHours = 2.0, TestCount = 40, CorrectCount = 31, WrongCount = 9, TopicsCovered = "ساختار اتم و جدول تناوبی", QualityRating = 4, CounselorNote = "تست‌های تشریحی بیشتر کار شود" },
+        new StudyDailyReport { Id = 3, ReportDate = DateTime.Today.AddDays(-1), SubjectName = "فیزیک", StudyHours = 2.5, TestCount = 45, CorrectCount = 38, WrongCount = 7, TopicsCovered = "حرکت بر خط راست و شتاب", QualityRating = 4 },
+        new StudyDailyReport { Id = 4, ReportDate = DateTime.Today.AddDays(-1), SubjectName = "ریاضیات", StudyHours = 2.0, TestCount = 35, CorrectCount = 28, WrongCount = 7, TopicsCovered = "معادلات درجه دوم و تابع", QualityRating = 3, CounselorNote = "فرمول‌های راس سهمی مرور شود" },
+        new StudyDailyReport { Id = 5, ReportDate = DateTime.Today, SubjectName = "ادبیات", StudyHours = 1.5, TestCount = 30, CorrectCount = 26, WrongCount = 4, TopicsCovered = "آرایه‌های ادبی (استعاره و مجاز)", QualityRating = 5 }
+    };
+
+    private double TotalHours => studyLogs.Sum(s => s.StudyHours);
+    private int TotalTests => studyLogs.Sum(s => s.TestCount);
+    private int TotalCorrect => studyLogs.Sum(s => s.CorrectCount);
+    private int TotalWrong => studyLogs.Sum(s => s.WrongCount);
+    private double AccuracyPercent => TotalTests > 0 ? Math.Round((double)TotalCorrect / TotalTests * 100, 1) : 0;
+
+    private void SaveReport()
+    {
+        if (string.IsNullOrWhiteSpace(newReport.SubjectName) || newReport.StudyHours <= 0)
+        {
+            snackBar.Add("لطفاً نام درس و ساعات مطالعه را به درستی وارد کنید.", Severity.Warning);
+            return;
+        }
+
+        newReport.WrongCount = Math.Max(0, newReport.TestCount - newReport.CorrectCount);
+        studyLogs.Insert(0, new StudyDailyReport
+        {
+            Id = studyLogs.Count + 1,
+            ReportDate = DateTime.Today,
+            SubjectName = newReport.SubjectName,
+            StudyHours = newReport.StudyHours,
+            TestCount = newReport.TestCount,
+            CorrectCount = newReport.CorrectCount,
+            WrongCount = newReport.WrongCount,
+            TopicsCovered = newReport.TopicsCovered,
+            StudentNote = newReport.StudentNote,
+            QualityRating = newReport.QualityRating
+        });
+
+        snackBar.Add("گزارش روزانه مطالعه با موفقیت ثبت شد!", Severity.Success);
+
+        // آماده‌سازی برای رکورد بعدی
+        newReport = new StudyDailyReport
+        {
+            SubjectName = "شیمی",
+            StudyHours = 2.0,
+            TestCount = 40,
+            CorrectCount = 32,
+            WrongCount = 8,
+            TopicsCovered = "",
+            QualityRating = 4
+        };
+    }
+}

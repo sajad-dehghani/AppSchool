@@ -1,5 +1,6 @@
-@using NovinApp.Client.Service
+﻿@using NovinApp.Client.Service
 @using NovinApp.Shared
+@using NovinApp.Shared.Constants
 @inject UserProfileStateService UserProfileState
 
 <MudPaper Elevation="0" Class="sidebar-root">
@@ -7,82 +8,96 @@
     @if (UserProfileState.IsLoaded)
     {
         <MudPaper Class="profile-card" Elevation="3">
-            <!-- Profile Card -->
             <MudText Align="Align.Center">
-                @if (@UserProfileState.CurrentUser?.pic != null)
+                @if (UserProfileState.CurrentUser?.pic != null)
                 {
                     <MudImage ObjectFit=ObjectFit.Cover Elevation="10" Class="rounded-circle mt-2" Src=@UserProfileState.CurrentUser?.pic Height="100" Width="100" />
                 }
                 else
                 {
-
                     <MudImage Src="img/no_pic.jpg" Class="rounded-circle" Elevation="5" Width=100 Height="100" />
                 }
             </MudText>
-            <MudText Typo="Typo.subtitle1" Class="mt-2">
-                @UserProfileState.CurrentUser?.fname
-            </MudText>
+            <MudText Typo="Typo.subtitle1" Class="mt-2">@UserProfileState.CurrentUser?.fname</MudText>
 
-            <MudGrid>
-
-                <MudText Typo="Typo.subtitle1" Class="mt-5">
-                    <MudChip Class="mt-2" T="string" Variant="Variant.Filled" Color="Color.Primary"> @UserProfileState.CurrentUser?.code_meli</MudChip>
-
+            <MudGrid Class="justify-center mt-2">
+                <MudText Typo="Typo.subtitle1" Class="mt-2">
+                    <MudChip T="string" Variant="Variant.Filled" Color="Color.Primary">@UserProfileState.CurrentUser?.code_meli</MudChip>
                 </MudText>
-                <MudText Typo="Typo.subtitle1" Class="mt-5">
-                    <MudChip Class="mt-2" T="string" Variant="Variant.Filled" Color="@(MudBlazor.Color.Tertiary)">پایه نهم</MudChip>
+                <MudText Typo="Typo.subtitle1" Class="mt-2">
+                    @{
+                        var role = UserProfileState.CurrentUser?.Rool ?? "";
+                        var normRole = UserRoles.NormalizeRole(role);
+                        var chipColor = normRole switch {
+                            UserRoles.SystemAdmin => MudBlazor.Color.Error,
+                            UserRoles.SchoolManager => MudBlazor.Color.Warning,
+                            UserRoles.Consultant => MudBlazor.Color.Tertiary,
+                            _ => MudBlazor.Color.Success
+                        };
+                    }
+                    <MudChip T="string" Variant="Variant.Filled" Color="@chipColor">@UserRoles.GetPersianTitle(role)</MudChip>
                 </MudText>
             </MudGrid>
-
-
         </MudPaper>
 
         <MudPaper Square="true" Class="pa-1" Elevation="3">
-        <!-- Navigation -->
-        <MudNavMenu Class="nav-menu">
+            <MudNavMenu Class="nav-menu">
 
-            <MudNavLink Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary" Href="/Home" Match="NavLinkMatch.All">
-                داشبورد
-            </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.Group" IconColor="Color.Primary" Href="/Moshaver">
-                مشاوران
-            </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.School" IconColor="Color.Primary" Href="/Students">
-                دانش آموزان
-            </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.EventNote" IconColor="Color.Success" Href="/StudyPlan">
-                برنامه‌ریزی کنکور
-            </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">
-                آزمون‌های روانشناسی
-            </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.PieChart" IconColor="Color.Info" Href="/StudentReports">
-                کارنامه‌های تحلیلی آزمون
-            </MudNavLink>
-            @if (UserProfileState.CurrentUser?.Rool?.Contains("مشاور") == true || UserProfileState.CurrentUser?.Rool?.Contains("مدیر") == true)
-            {
-                <MudNavLink Icon="@Icons.Material.Filled.AssignmentInd" IconColor="Color.Info" Href="/CounselorReports">
-                    کارتابل مشاور (ارزیابی‌ها)
+                <MudNavLink Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary" Href="/Home" Match="NavLinkMatch.All">
+                    داشبورد
                 </MudNavLink>
-            }
-            <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Primary" Href="/maping">
-                کارنامه و تحلیل نتایج
-            </MudNavLink>
-                <MudNavLink Icon="@Icons.Material.Filled.FormatListNumberedRtl" IconColor="Color.Primary" Href="/QuestionsList">
-                    بانک سوالات
-                </MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Filled.AttachMoney" IconColor="Color.Primary" Href="/purchase">
-                امور مالی و تراکنش‌ها
-            </MudNavLink>
-                <MudNavLink Icon="@Icons.Material.Filled.Settings" IconColor="Color.Primary" Href="/maping">
-                تنظیمات
-            </MudNavLink>
 
+                @* === مدیر سیستم === *@
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudNavGroup Title="مدیریت سیستم" Icon="@Icons.Material.Filled.AdminPanelSettings" IconColor="Color.Error" Expanded="true">
+                        <MudNavLink Icon="@Icons.Material.Filled.LocationCity" IconColor="Color.Warning" Href="/Schools">مدیریت مدارس</MudNavLink>
+                        <MudNavLink Icon="@Icons.Material.Filled.SupervisorAccount" IconColor="Color.Tertiary" Href="/Consultants">مدیریت مشاوران</MudNavLink>
+                        <MudNavLink Icon="@Icons.Material.Filled.Group" IconColor="Color.Primary" Href="/Students">مدیریت دانش‌آموزان</MudNavLink>
+                    </MudNavGroup>
+                }
 
-        </MudNavMenu>
+                @* === مدیر مدرسه === *@
+                @if (UserProfileState.IsSchoolManager)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.School" IconColor="Color.Warning" Href="/SchoolManagerPanel">پنل مدیر مدرسه</MudNavLink>
+                }
+
+                @* === مشاور === *@
+                @if (UserProfileState.IsConsultant)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.SupervisorAccount" IconColor="Color.Tertiary" Href="/ConsultantPanel">پنل مشاور</MudNavLink>
+                }
+
+                @* === دانش آموز === *@
+                @if (UserProfileState.IsStudent)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.Person" IconColor="Color.Success" Href="/StudentPanel">پنل من</MudNavLink>
+                }
+
+                @* === منوهای مشترک === *@
+                @if (!UserProfileState.IsStudent)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.EventNote" IconColor="Color.Success" Href="/StudyPlan">برنامه‌ریزی کنکور</MudNavLink>
+                }
+
+                <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">آزمون‌های روانشناسی</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.PieChart" IconColor="Color.Info" Href="/StudentReports">کارنامه‌های تحلیلی آزمون</MudNavLink>
+
+                @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.AssignmentInd" IconColor="Color.Info" Href="/CounselorReports">کارتابل مشاور (ارزیابی‌ها)</MudNavLink>
+                }
+
+                <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Primary" Href="/maping">کارنامه و تحلیل نتایج</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.FormatListNumberedRtl" IconColor="Color.Primary" Href="/QuestionsList">بانک سوالات</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.AttachMoney" IconColor="Color.Primary" Href="/purchase">امور مالی و تراکنش‌ها</MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Settings" IconColor="Color.Primary" Href="/maping">تنظیمات</MudNavLink>
+
+            </MudNavMenu>
         </MudPaper>
     }
-    </MudPaper>
+</MudPaper>
 
 @code {
 

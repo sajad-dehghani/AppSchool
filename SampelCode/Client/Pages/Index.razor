@@ -1,0 +1,199 @@
+@page "/Home"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+@* بنر خوش‌آمدگویی *@
+<div class="page-banner banner-primary mb-5">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-center gap-2 mb-1">
+                <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small" Icon="@Icons.Material.Filled.WorkspacePremium" Class="font-weight-bold text-dark">
+                    نقش کاربری: @(UserProfileState.CurrentUser?.Rool ?? "دانش‌آموز")
+                </MudChip>
+                @if (!string.IsNullOrEmpty(UserProfileState.CurrentUser?.code_meli))
+                {
+                    <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small" Style="color: white; border-color: rgba(255,255,255,0.4);">
+                        کد ملی: @UserProfileState.CurrentUser.code_meli
+                    </MudChip>
+                }
+            </div>
+            <MudText Typo="Typo.h4" Class="font-weight-bold text-white mt-2" Style="font-size: clamp(1.2rem, 3vw, 1.8rem);">
+                سلام @(UserProfileState.CurrentUser?.fname ?? "کاربر گرامی")، به سامانه نوین خوش آمدید 👋
+            </MudText>
+            <MudText Typo="Typo.body1" Class="mt-2 text-white" Style="opacity: 0.92; font-size: 0.95rem; max-width: 780px;">
+                سامانه هوشمند هدایت تحصیلی، آزمون‌های رغبت‌سنجی شغلی و روانشناسی، و پایش مستمر برنامه‌ریزی کنکور سراسری
+            </MudText>
+        </div>
+
+        <div class="d-flex gap-2 align-center flex-wrap">
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Psychology" Href="/Products" Class="font-weight-bold">
+                آزمون‌های روانشناسی
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Surface" StartIcon="@Icons.Material.Filled.EventNote" Href="/StudyPlan" Class="font-weight-bold">
+                برنامه مطالعاتی
+            </MudButton>
+        </div>
+    </div>
+</div>
+
+@* میانبرهای اصلی سامانه *@
+<MudText Typo="Typo.h6" Class="font-weight-bold mb-3 d-flex align-center">
+    <MudIcon Icon="@Icons.Material.Filled.FlashOn" Color="Color.Warning" Class="me-2" />
+    دسترسی سریع به بخش‌های اصلی
+</MudText>
+
+<MudGrid Class="mb-6">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="0" Class="modern-card action-card h-100" Style="border-top: 4px solid var(--mud-palette-primary) !important;">
+            <MudCardContent Class="text-center pa-5">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Variant="Variant.Filled" Class="mb-3 mx-auto shadow-sm">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Medium" />
+                </MudAvatar>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">تست انتخاب رشته</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block" Style="min-height: 38px;">
+                    آزمون رغبت‌سنجی شغلی و تحصیلی هالند (RIASEC)
+                </MudText>
+            </MudCardContent>
+            <MudCardActions Class="pa-4 pt-0">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="/Quiz" EndIcon="@Icons.Material.Filled.ArrowBack">
+                    شروع آزمون
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="0" Class="modern-card action-card h-100" Style="border-top: 4px solid var(--mud-palette-success) !important;">
+            <MudCardContent Class="text-center pa-5">
+                <MudAvatar Color="Color.Success" Size="Size.Large" Variant="Variant.Filled" Class="mb-3 mx-auto shadow-sm">
+                    <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Medium" />
+                </MudAvatar>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">برنامه‌ریزی کنکور</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block" Style="min-height: 38px;">
+                    ثبت ساعات مطالعه، تست‌ها و پایش هفتگی
+                </MudText>
+            </MudCardContent>
+            <MudCardActions Class="pa-4 pt-0">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Href="/StudyPlan" EndIcon="@Icons.Material.Filled.ArrowBack">
+                    ثبت گزارش روزانه
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="0" Class="modern-card action-card h-100" Style="border-top: 4px solid var(--mud-palette-warning) !important;">
+            <MudCardContent Class="text-center pa-5">
+                <MudAvatar Color="Color.Warning" Size="Size.Large" Variant="Variant.Filled" Class="mb-3 mx-auto shadow-sm">
+                    <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="Size.Medium" />
+                </MudAvatar>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">کارنامه آزمون‌ها</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block" Style="min-height: 38px;">
+                    مشاهده تراز و درصدهای آزمون‌های آزمایشی
+                </MudText>
+            </MudCardContent>
+            <MudCardActions Class="pa-4 pt-0">
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" FullWidth="true" Href="/StudentReports" EndIcon="@Icons.Material.Filled.ArrowBack">
+                    تحلیل کارنامه
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="0" Class="modern-card action-card h-100" Style="border-top: 4px solid var(--mud-palette-secondary) !important;">
+            <MudCardContent Class="text-center pa-5">
+                <MudAvatar Color="Color.Secondary" Size="Size.Large" Variant="Variant.Filled" Class="mb-3 mx-auto shadow-sm">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Medium" />
+                </MudAvatar>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">پنل مشاوران</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block" Style="min-height: 38px;">
+                    مشاهده لیست دانش‌آموزان و ارائه بازخورد
+                </MudText>
+            </MudCardContent>
+            <MudCardActions Class="pa-4 pt-0">
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true" Href="/Students" EndIcon="@Icons.Material.Filled.ArrowBack">
+                    مدیریت دانش‌آموزان
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@* وضعیت پیشرفت تحصیلی و آمادگی کنکور *@
+<MudText Typo="Typo.h6" Class="font-weight-bold mb-3 d-flex align-center">
+    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Primary" Class="me-2" />
+    وضعیت پیشرفت مطالعاتی و آمادگی
+</MudText>
+
+<MudGrid Class="mt-1">
+    <MudItem md="6" xs="12">
+        <MudCard Elevation="0" Class="modern-card">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled"><MudIcon Icon="@Icons.Material.Filled.Speed" /></MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold">پیشرفت هفتگی ساعات مطالعه</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تطابق با بودجه‌بندی آزمون</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <span class="font-weight-bold">ساعات اجرا شده: ۳۸ ساعت</span>
+                    <span class="font-weight-bold" style="color: var(--mud-palette-success);">۸۵% از هدف</span>
+                </div>
+                <MudProgressLinear Color="Color.Success" Size="Size.Large" Value="85" Rounded="true" Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    هدف مشاور برای هفته جاری: ۴۵ ساعت مطالعه مفید و ۷۵۰ تست اختصاصی
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem md="6" xs="12">
+        <MudCard Elevation="0" Class="modern-card">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Info" Variant="Variant.Filled"><MudIcon Icon="@Icons.Material.Filled.AutoGraph" /></MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold">آمادگی جامع کنکور سراسری</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تسلط بر مباحث دهم، یازدهم و دوازدهم</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <span class="font-weight-bold">پوشش سرفصل‌ها</span>
+                    <span class="font-weight-bold" style="color: var(--mud-palette-primary);">۶۸%</span>
+                </div>
+                <MudProgressLinear Color="Color.Primary" Size="Size.Large" Value="68" Rounded="true" Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    روند مطالعاتی شما بالاتر از میانگین منطقه آموزشی ارزیابی شده است.
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<style>
+    .action-card {
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12) !important;
+    }
+</style>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserProfileState.IsLoaded)
+        {
+            await UserProfileState.LoadUserAsync();
+        }
+    }
+}

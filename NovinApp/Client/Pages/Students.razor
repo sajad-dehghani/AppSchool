@@ -1,340 +1,883 @@
-﻿@page "/Students"
+@page "/Students"
 @using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
 @using NovinApp.Client.Service
 @using NovinApp.Client.Component
-@using NovinApp.Shared
-@inject IJSRuntime JsRuntime
-@inject MudBlazor.ISnackbar snackBar
-@inject NavigationManager nav
-@inject IDialogService Dialog
-@inject HttpClient _httpClient
+@using NovinApp.Client.Helpers
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Common
+@using NovinApp.Shared.DTOs.Consultants
+@using NovinApp.Shared.DTOs.Schools
+@using NovinApp.Shared.DTOs.Students
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject IDialogService dialogService
 @inject UserProfileStateService UserProfileState
 @attribute [Authorize]
 
-<MudPaper Elevation="25" Class="pa-3">
-    <MudText Align="Align.Center" Typo="Typo.h5">لیست دانش آموزان</MudText>
-</MudPaper>
-<MudDivider DividerType="DividerType.Inset" />
-
-<MudGrid Class="mt-1 pa-4">
-    <MudItem xs="12">
-        <MudDataGrid Items="@data_list" T="Student" SelectedItem="@selectedItem"
-                     QuickFilter="@_quickFilter" RowClick="@RowClicked" Hover="true" Dense="@true" Striped="@true" Bordered="@true" RowStyleFunc="@_rowStyleFunc"
-                     Class="cursor-pointer" Hideable="true" FixedHeader="true" Loading="isload">
-
-            <ToolBarContent>
-                <MudToolBar Class="d-flex align-center flex-wrap gap-1">
-
-                    <MudTooltip Text="افزودن دانش آموز جدید" Color="Color.Primary" Placement="Placement.Bottom" Arrow="true">
-                        <MudIconButton OnClick="@(() => Add())"
-                                   Color="Color.Primary"
-                                   Icon="@Icons.Material.Outlined.PersonAdd"
-                                   Size="Size.Small"
-                                   Class="ml-1"/>                    
-
-                    </MudTooltip>
-
-                    <MudTooltip Text="ویرایش سطر انتخاب شده" Color="Color.Warning" Placement="Placement.Bottom" Arrow="true">
-                        <MudIconButton OnClick="@(() => Edit())"
-                                       Icon="@Icons.Material.Outlined.Edit"
-                                       Color="Color.Warning"
-                                       Disabled="@(selectedRowNumber == -1)" />
-                    </MudTooltip>
-
-                    <MudTooltip Text="حذف سطر انتخاب شده" Color="Color.Error" Placement="Placement.Bottom" Arrow="true">
-                        <MudIconButton OnClick="@(() => Delete())"
-                                       Icon="@Icons.Material.Outlined.DeleteOutline"
-                                       Color="Color.Error"
-                                       Disabled="@(selectedRowNumber == -1)" />
-                    </MudTooltip>
-
-                    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
-
-                    <MudTooltip Text="چاپ گزارش" Color="Color.Secondary" Placement="Placement.Bottom" Arrow="true">
-                        <MudIconButton Icon="@Icons.Material.Outlined.Print" Color="Color.Secondary" />
-                    </MudTooltip>
-
-                    <MudTooltip Text="تازه‌سازی اطلاعات" Color="Color.Success" Placement="Placement.Bottom" Arrow="true">
-                        <MudIconButton OnClick="@(() => Btn_Refresh())"
-                                       Icon="@Icons.Material.Outlined.Refresh"
-                                       Color="Color.Success" />
-                    </MudTooltip>
-
-
-                </MudToolBar>
-                <MudSpacer />
-
-                <MudTextField @bind-Value="_searchString"
-                              Placeholder="جستجوی نام یا کد ملی..."
-                              Adornment="Adornment.Start"
-                              Immediate="true"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              IconSize="Size.Medium"
-                              Class="mt-0 search-box"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Clearable="true" />
-            </ToolBarContent>
-
-            <NoRecordsContent>
-                <MudText Align="Align.Center" Typo="Typo.body1" Class="pa-4">
-                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2" />
-                    <br />
-                    اطلاعاتی یافت نشد
-                    <br />
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Outlined.Refresh"
-                               OnClick="@(() => Btn_Refresh())"
-                               Class="mt-2">
-                        تازه‌سازی اطلاعات
-                    </MudButton>
-                </MudText>
-            </NoRecordsContent>
-            <Columns>
-                <TemplateColumn Title="ردیف"
-                                Sortable="false"
-                                Filterable="false">
-                    <CellTemplate>
-                        @{
-                            var list = filtered_list.ToList();
-                            var idx = list.IndexOf(context.Item) + 1;
-                        }
-                        <MudText Typo="Typo.body2">@idx</MudText>
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="عکس" Sortable="false" Filterable="false">
-                    <CellTemplate>
-                        @if (!string.IsNullOrEmpty(context.Item.pic))
-                        {
-                            <MudImage Src="@context.Item.pic" Class="rounded-circle" Elevation="5" Width="60" Height="60" />
-                        }
-                        else
-                        {
-                            <MudImage Src="img/no_pic.jpg" Class="rounded-circle" Elevation="5" Width="60" Height="60" />
-                        }
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.fname" Title="نام و نام خانوادگی" />
-                <PropertyColumn Property="x => x.code_meli" Title="کد ملی" />
-                <PropertyColumn Property="x => x.mobile" Title="شماره تماس" />
-                <PropertyColumn Property="x => x.pass" Title="کلمه عبور" />
-                <TemplateColumn Title="مشاور" Sortable="true" Filterable="true">
-                    <CellTemplate>
-                        <MudChip T="string"
-                                 Text="@context.Item.Moshaver"
-                                 Variant="Variant.Outlined"
-                                 Color="@GetRoleColor(context.Item.Rool)"
-                                 Size="Size.Small" />
-                    </CellTemplate>
-                </TemplateColumn>
-
-                <TemplateColumn Title="وضعیت" Sortable="true" Filterable="true">
-                    <CellTemplate>
-                        @if (context.Item.active == true)
-                        {
-                            <MudChip T="string"
-                                     Text="فعال"
-                                     Variant="Variant.Outlined"
-                                     Color="Color.Success"
-                                     Size="Size.Small"
-                                     Icon="@Icons.Material.Filled.CheckCircle" />
-                        }
-                        else
-                        {
-                            <MudChip T="string"
-                                     Text="غیرفعال"
-                                     Variant="Variant.Outlined"
-                                     Color="Color.Error"
-                                     Size="Size.Small"
-                                     Icon="@Icons.Material.Filled.Cancel" />
-                        }
-                    </CellTemplate>
-                </TemplateColumn>
-@*                 <TemplateColumn Title="عملیات" Sortable="false" Filterable="false">
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Outlined.Settings" Color="Color.Info" />
-                    </CellTemplate>
-                </TemplateColumn> *@
-            </Columns>
-            <PagerContent>
-                @if (filtered_list != null && filtered_list.Any())
-                {
-                    <MudDataGridPager T="Student"
-                                      PageSizeOptions="new int[]{15, 100}"
-                                      RowsPerPageString="تعداد سطر در هر صفحه"
-                                      InfoFormat="نمایش {first_item} تا {last_item} از مجموع {all_items}" />
-                }
-            </PagerContent>
-        </MudDataGrid>
-    </MudItem>
-</MudGrid>
-<style>
-    .cursor-pointer {
-        cursor: pointer;
-    }
-
-    .ltr {
-        direction: ltr;
-    }
-
-    .fw-bold {
-        font-weight: bold;
-    }
-
-    .search-box {
-        min-width: 250px;
-    }
-</style>
-@code {
-    private IEnumerable<Student> data_list = new List<Student>();
-    private IEnumerable<Student> filtered_list = new List<Student>();
-    private string _searchString = "";
-    private int selectedRowNumber = -1;
-    private int lastRowNumber = -1;
-    private Student selectedItem = null;
-    bool isload = false;
-    protected override async Task OnInitializedAsync()
-    {
-        await Btn_Refresh();
-    }
-
-    async Task Btn_Refresh()
-    {
-        try
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.School" Class="ml-2 align-middle" />
+                @(UserProfileState.IsConsultant ? "دانش‌آموزان تحت نظر من" : "مدیریت و لیست پرونده دانش‌آموزان")
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                مشاهده اطلاعات هویتی و تحصیلی، انتساب به مدرسه و مشاور، و دسترسی به سوابق آموزشی
+            </MudText>
+        </div>
+        @if (UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
         {
-            isload = true;
-            data_list = await _httpClient.GetFromJsonAsync<List<Student>>("api/User/students") ?? new List<Student>();
-            filtered_list = data_list;
-            isload = false;
-
+            <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.PersonAdd"
+                       Class="text-primary font-weight-bold" OnClick="OpenCreateDialog">
+                ثبت دانش‌آموز جدید
+            </MudButton>
         }
-        catch
-        {
-            isload = false;
+    </div>
+</div>
 
-            snackBar.Add("خطا در دریافت اطلاعات کاربران", Severity.Error);
-        }
-        await InvokeAsync(() => StateHasChanged());
-    }
+<MudPaper Elevation="2" Class="pa-4 rounded-lg">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudTextField @bind-Value="searchString" Placeholder="جستجوی نام یا کد ملی..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-250" />
 
-    // رنگ چیپ بر اساس نقش
-    Color GetRoleColor(string role)
-    {
-        return role switch
-        {
-            "مدیر" => Color.Error,
-            "مشاور" => Color.Warning,
-            "دانش آموز" => Color.Info,
-            _ => Color.Default
-        };
-    }
-
-    void Add()
-    {
-        Cls_global.select_row_titr = "Students";
-
-        nav.NavigateTo("/Users");
-    }
-
-    void Edit()
-    {
-        if (data_list.Count() >= 1)
-        {
-            if (selectedRowNumber != -1)
+            @if (UserProfileState.IsSystemAdmin)
             {
-                Cls_global.select_row_id = selectedRowNumber;
-                Cls_global.IsEdit = true;
-                Cls_global.select_row_titr = "Students";
-
-                nav.NavigateTo($"/Users");
-            }
-        }
-    }
-
-    private Func<Student, int, string> _rowStyleFunc => (x, i) =>
-    {
-        if (selectedRowNumber == lastRowNumber)
-        {
-            lastRowNumber = selectedRowNumber;
-            return "";
-        }
-
-        if (x.Id == selectedRowNumber)
-            return "background-color: rgba(var(--mud-palette-primary-rgb), 0.12); border-left: 3px solid var(--mud-palette-primary);";
-
-        return "";
-    };
-
-    void RowClicked(DataGridRowClickEventArgs<Student> args)
-    {
-        if (selectedRowNumber == args.Item.Id)
-        {
-            selectedRowNumber = -1;
-        }
-        else
-        {
-            selectedRowNumber = args.Item.Id;
-
-        }
-        //  Idrow = args.Item.rowId;
-    }
-    private Func<Student, bool> _quickFilter => x =>
-{
-    if (string.IsNullOrWhiteSpace(_searchString))
-        return true;
-
-    if (x.code_meli.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-        return true;
-    if (x.fname.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-        return true;
-
-
-    return false;
-};
-
-    async Task Delete()
-    {
-
-        if (data_list.Count() >= 1)
-        {
-            if (selectedRowNumber != -1)
-            {
-
-                if (await OpenDialog("آیا از حذف سطر انتخابی اطمینان دارید ؟").ConfigureAwait(false))
-                {
-                    var respon = await _httpClient.DeleteAsync($"api/User/{selectedRowNumber}");
-
-                    if (respon.IsSuccessStatusCode)
+                <MudSelect T="int?" @bind-Value="selectedSchoolFilter" Label="فیلتر مدرسه" Dense="true"
+                           Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-200" Clearable="true"
+                           SelectedValuesChanged="LoadStudents">
+                    @foreach (var s in schools)
                     {
-                        selectedRowNumber = -1;
-                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
-                        snackBar.Add("اطلاعات مورد نظر با موفقیت حذف شد", Severity.Info);
+                        <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="int?" @bind-Value="selectedConsultantFilter" Label="فیلتر مشاور" Dense="true"
+                           Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-200" Clearable="true"
+                           SelectedValuesChanged="LoadStudents">
+                    @foreach (var c in consultants)
+                    {
+                        <MudSelectItem Value="@((int?)c.UserId)">@c.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" Size="Size.Small"
+                           Variant="Variant.Outlined" OnClick="RefreshStudents" Title="تازه‌سازی لیست" />
+        </div>
+
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
+            تعداد کل: @FilteredStudents.Count() دانش‌آموز
+        </MudChip>
+    </div>
+
+    @* نوار ابزار عملیات گروهی *@
+    @if (selectedStudents != null && selectedStudents.Any())
+    {
+        <div class="pa-3 mb-3 rounded-lg d-flex align-center justify-space-between flex-wrap gap-2"
+             style="background: #eef5ff; border: 1px solid #bfdbfe;">
+            <div class="d-flex align-center gap-2">
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+                    تعداد انتخاب‌شده: @selectedStudents.Count دانش‌آموز
+                </MudChip>
+                <MudText Typo="Typo.body2" Class="font-weight-bold text-primary">عملیات گروهی:</MudText>
+            </div>
+
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.AssignmentInd" OnClick="OpenBulkAssignDialog">
+                    انتساب دسته‌جمعی (مدرسه / مشاور)
+                </MudButton>
+
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Delete" OnClick="BulkDeleteStudents">
+                        حذف دسته‌جمعی
+                    </MudButton>
+                }
+
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                           OnClick="@(() => selectedStudents.Clear())">
+                    لغو انتخاب‌ها
+                </MudButton>
+            </div>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center align-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.subtitle2" Class="ms-3">در حال بارگذاری پرونده‌های دانش‌آموزان...</MudText>
+        </div>
+    }
+    else if (!FilteredStudents.Any())
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg my-4">
+            هیچ دانش‌آموزی یافت نگردید یا با فیلترهای انتخابی تطابق ندارد.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredStudents" MultiSelection="true" @bind-SelectedItems="selectedStudents"
+                  Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>نام دانش‌آموز</MudTh>
+                <MudTh>کد ملی</MudTh>
+                <MudTh>پایه و رشته</MudTh>
+                <MudTh>مدرسه</MudTh>
+                <MudTh>مشاور تحصیلی</MudTh>
+                <MudTh>تلفن</MudTh>
+                <MudTh>وضعیت</MudTh>
+                @if (UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+                {
+                    <MudTh Class="text-center">عملیات</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="نام دانش‌آموز">
+                    <div class="d-flex align-center gap-2">
+                        @if (!string.IsNullOrEmpty(context.ProfilePictureUrl))
+                        {
+                            <MudAvatar Size="Size.Medium" Elevation="2">
+                                <MudImage Src="@context.ProfilePictureUrl" Style="width: 100%; height: 100%; object-fit: cover;" />
+                            </MudAvatar>
+                        }
+                        else
+                        {
+                            <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                            </MudAvatar>
+                        }
+                        <div>
+                            <span class="font-weight-bold text-primary">@context.FullName</span>
+                            @if (!string.IsNullOrEmpty(context.FatherName))
+                            {
+                                <span class="text-muted d-block small">فرزند: @context.FatherName</span>
+                            }
+                        </div>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="کد ملی">@context.NationalCode</MudTd>
+                <MudTd DataLabel="پایه و رشته">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Dark">
+                        @(context.GradeLevel ?? "پایه دوازدهم") - @(context.FieldOfStudy ?? "علوم تجربی")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="مدرسه">
+                    @if (!string.IsNullOrEmpty(context.SchoolName))
+                    {
+                        <span class="badge bg-light text-dark">@context.SchoolName</span>
                     }
                     else
                     {
-                        selectedRowNumber = -1;
-                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
-                        snackBar.Add("حذف اطلاعات با خطا مواجه شد", Severity.Error);
+                        <span class="text-muted">فاقد مدرسه</span>
                     }
-                    await Btn_Refresh();
+                </MudTd>
+                <MudTd DataLabel="مشاور">
+                    @if (!string.IsNullOrEmpty(context.ConsultantName) && context.ConsultantName != "بدون مشاور")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.SupervisorAccount" Size="Size.Small" Class="me-1" />
+                            @context.ConsultantName
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <span class="text-muted">بدون مشاور</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="تلفن">@(context.PhoneNumber ?? "-")</MudTd>
+                <MudTd DataLabel="وضعیت">
+                    @if (context.IsActive)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">فعال</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">غیرفعال</MudChip>
+                    }
+                </MudTd>
+                @if (UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+                {
+                    <MudTd Class="text-center">
+                        <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning"
+                                           OnClick="@(() => OpenEditDialog(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Color="Color.Info"
+                                           OnClick="@(() => OpenAssignDialog(context))" />
+                            @if (UserProfileState.IsSystemAdmin)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                               OnClick="@(() => DeleteStudent(context))" />
+                            }
+                        </MudButtonGroup>
+                    </MudTd>
                 }
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@* دیالوگ ثبت دانش‌آموز جدید *@
+<MudDialog @bind-Visible="isCreateDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">ثبت دانش‌آموز جدید</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@createModel" OnValidSubmit="SaveCreateStudent">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.FullName" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.FullName)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.NationalCode" Label="کد ملی (نام کاربری)" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.NationalCode)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.Password" Label="کلمه عبور ورود" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Required="true" For="@(() => createModel.Password)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.FatherName" Label="نام پدر" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.PhoneNumber" Label="تلفن همراه" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="createModel.StudentCode" Label="شماره دانش‌آموزی" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="createModel.GradeLevel" Label="پایه تحصیلی" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("پایه دهم")">پایه دهم</MudSelectItem>
+                        <MudSelectItem Value="@("پایه یازدهم")">پایه یازدهم</MudSelectItem>
+                        <MudSelectItem Value="@("پایه دوازدهم")">پایه دوازدهم</MudSelectItem>
+                        <MudSelectItem Value="@("فارغ‌التحصیل")">فارغ‌التحصیل / پشت کنکور</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="createModel.FieldOfStudy" Label="رشته تحصیلی" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("علوم تجربی")">علوم تجربی</MudSelectItem>
+                        <MudSelectItem Value="@("ریاضی و فیزیک")">ریاضی و فیزیک</MudSelectItem>
+                        <MudSelectItem Value="@("علوم انسانی")">علوم انسانی</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" @bind-Value="createModel.SchoolId" Label="مدرسه" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                            @foreach (var s in schools)
+                            {
+                                <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="createModel.ConsultantId" Label="مشاور تحصیلی (اختیاری)" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                        <MudSelectItem Value="@((int?)null)">بدون مشاور</MudSelectItem>
+                        @foreach (var c in consultants)
+                        {
+                            <MudSelectItem Value="@((int?)c.UserId)">@c.FullName (@(c.Specialty ?? "مشاور"))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isCreateDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveCreateStudent" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال ذخیره...</span>
+            }
+            else
+            {
+                <span>ثبت دانش‌آموز</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ ویرایش دانش‌آموز *@
+<MudDialog @bind-Visible="isEditDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">ویرایش پرونده دانش‌آموز</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@updateModel" OnValidSubmit="SaveUpdateStudent">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.FullName" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => updateModel.FullName)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.FatherName" Label="نام پدر" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.PhoneNumber" Label="تلفن همراه" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="updateModel.StudentCode" Label="شماره دانش‌آموزی" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="updateModel.GradeLevel" Label="پایه تحصیلی" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("پایه دهم")">پایه دهم</MudSelectItem>
+                        <MudSelectItem Value="@("پایه یازدهم")">پایه یازدهم</MudSelectItem>
+                        <MudSelectItem Value="@("پایه دوازدهم")">پایه دوازدهم</MudSelectItem>
+                        <MudSelectItem Value="@("فارغ‌التحصیل")">فارغ‌التحصیل</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="updateModel.FieldOfStudy" Label="رشته تحصیلی" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("علوم تجربی")">علوم تجربی</MudSelectItem>
+                        <MudSelectItem Value="@("ریاضی و فیزیک")">ریاضی و فیزیک</MudSelectItem>
+                        <MudSelectItem Value="@("علوم انسانی")">علوم انسانی</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" @bind-Value="updateModel.SchoolId" Label="مدرسه" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                            @foreach (var s in schools)
+                            {
+                                <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="updateModel.ConsultantId" Label="مشاور تحصیلی (اختیاری)" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                        <MudSelectItem Value="@((int?)null)">بدون مشاور</MudSelectItem>
+                        @foreach (var c in consultants)
+                        {
+                            <MudSelectItem Value="@((int?)c.UserId)">@c.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.NewPassword" Label="کلمه عبور جدید (اختیاری)" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6" Class="d-flex align-center">
+                    <MudSwitch @bind-Value="updateModel.IsActive" Label="وضعیت فعالیت" Color="Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isEditDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveUpdateStudent" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال به‌روزرسانی...</span>
+            }
+            else
+            {
+                <span>ذخیره تغییرات</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ اختصاصی انتساب مدرسه و مشاور *@
+<MudDialog @bind-Visible="isAssignDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">انتساب مدرسه و مشاور برای @assignStudentName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="3" Class="pt-2">
+            @if (UserProfileState.IsSystemAdmin)
+            {
+                <MudItem xs="12">
+                    <MudSelect T="int?" @bind-Value="assignModel.SchoolId" Label="انتخاب مدرسه" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var s in schools)
+                        {
+                            <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            <MudItem xs="12">
+                <MudSelect T="int?" @bind-Value="assignModel.ConsultantId" Label="انتخاب مشاور تحصیلی (اختیاری)" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem Value="@((int?)null)">بدون مشاور</MudSelectItem>
+                    @foreach (var c in consultants)
+                    {
+                        <MudSelectItem Value="@((int?)c.UserId)">@c.FullName (@(c.Specialty ?? "مشاور"))</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isAssignDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="SaveAssignStudent" Disabled="isSaving">
+            ثبت انتساب
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ انتساب دسته‌جمعی مدرسه و مشاور *@
+<MudDialog @bind-Visible="isBulkAssignDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentInd" Class="ml-2 align-middle text-success" />
+            انتساب دسته‌جمعی (@selectedStudents.Count دانش‌آموز)
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3 text-muted">
+            گزینه‌های مورد نظر جهت اعمال همزمان روی تمام دانش‌آموزان انتخاب‌شده را مشخص فرمایید:
+        </MudText>
+
+        <MudPaper Elevation="0" Class="pa-3 mb-3" Style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+            @if (UserProfileState.IsSystemAdmin)
+            {
+                <div class="mb-3">
+                    <MudCheckBox T="bool" @bind-Value="bulkUpdateSchool" Label="تغییر / انتساب مدرسه" Color="Color.Primary" />
+                    @if (bulkUpdateSchool)
+                    {
+                        <MudSelect T="int?" @bind-Value="bulkSelectedSchoolId" Label="انتخاب مدرسه مقصد" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1" Clearable="true">
+                            <MudSelectItem Value="@((int?)null)">بدون مدرسه (حذف مدرسه)</MudSelectItem>
+                            @foreach (var s in schools)
+                            {
+                                <MudSelectItem Value="@((int?)s.Id)">@s.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </div>
+            }
+
+            <div>
+                <MudCheckBox T="bool" @bind-Value="bulkUpdateConsultant" Label="تغییر / انتساب مشاور تحصیلی" Color="Color.Success" />
+                @if (bulkUpdateConsultant)
+                {
+                    <MudSelect T="int?" @bind-Value="bulkSelectedConsultantId" Label="انتخاب مشاور مقصد" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1" Clearable="true">
+                        <MudSelectItem Value="@((int?)null)">بدون مشاور (حذف مشاور فعلی)</MudSelectItem>
+                        @foreach (var c in consultants)
+                        {
+                            <MudSelectItem Value="@((int?)c.UserId)">@c.FullName (@(c.Specialty ?? "مشاور"))</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+            </div>
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isBulkAssignDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="SaveBulkAssign" Disabled="isSaving || (!bulkUpdateSchool && !bulkUpdateConsultant)">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال اعمال انتساب...</span>
+            }
+            else
+            {
+                <span>اعمال انتساب دسته‌جمعی</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .page-banner { border-radius: 16px; padding: 20px 24px; }
+    .banner-primary { background: linear-gradient(135deg, #0D47A1 0%, #1976D2 60%, #42A5F5 100%); }
+</style>
+
+@code {
+    private List<StudentDto> students = new();
+    private List<SchoolDto> schools = new();
+    private List<ConsultantDto> consultants = new();
+    private HashSet<StudentDto> selectedStudents = new();
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isCreateDialogOpen = false;
+    private bool isEditDialogOpen = false;
+    private bool isAssignDialogOpen = false;
+    private bool isBulkAssignDialogOpen = false;
+
+    private bool bulkUpdateSchool = false;
+    private int? bulkSelectedSchoolId = null;
+    private bool bulkUpdateConsultant = false;
+    private int? bulkSelectedConsultantId = null;
+
+    private string searchString = "";
+    private int? selectedSchoolFilter = null;
+    private int? selectedConsultantFilter = null;
+    private string assignStudentName = "";
+
+    private CreateStudentDto createModel = new();
+    private UpdateStudentDto updateModel = new();
+    private AssignStudentDto assignModel = new();
+
+    private DialogOptions dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseButton = true
+    };
+
+    private IEnumerable<StudentDto> FilteredStudents =>
+        string.IsNullOrWhiteSpace(searchString)
+            ? students
+            : students.Where(s => (s.FullName != null && s.FullName.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ||
+                                  (s.NationalCode != null && s.NationalCode.Contains(searchString)) ||
+                                  (s.StudentCode?.ToString().Contains(searchString) ?? false) ||
+                                  (s.SchoolName != null && s.SchoolName.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ||
+                                  (s.ConsultantName != null && s.ConsultantName.Contains(searchString, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchoolsAndConsultants();
+        await LoadStudents();
+    }
+
+    private async Task LoadSchoolsAndConsultants()
+    {
+        try
+        {
+            var schoolMsg = await _http.GetAsync("api/schools");
+            var schoolRes = await schoolMsg.ParseApiResponseAsync<List<SchoolDto>>();
+            if (schoolRes.Success && schoolRes.Data != null)
+                schools = schoolRes.Data;
+
+            var consMsg = await _http.GetAsync("api/consultants");
+            var consRes = await consMsg.ParseApiResponseAsync<List<ConsultantDto>>();
+            if (consRes.Success && consRes.Data != null)
+                consultants = consRes.Data;
+        }
+        catch { }
+    }
+
+    private async Task LoadStudents()
+    {
+        isLoading = true;
+        try
+        {
+            string url = "api/students?";
+            if (selectedSchoolFilter.HasValue) url += $"schoolId={selectedSchoolFilter.Value}&";
+            if (selectedConsultantFilter.HasValue) url += $"consultantId={selectedConsultantFilter.Value}&";
+
+            var response = await _http.GetAsync(url);
+            var res = await response.ParseApiResponseAsync<List<StudentDto>>();
+            if (res.Success && res.Data != null)
+            {
+                students = res.Data;
+            }
+            else
+            {
+                students = new();
+                if (!string.IsNullOrEmpty(res.Message))
+                {
+                    snackBar.Add(res.Message, Severity.Warning);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در بارگذاری دانش‌آموزان: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        createModel = new CreateStudentDto
+        {
+            GradeLevel = "پایه دوازدهم",
+            FieldOfStudy = "علوم تجربی",
+            Gender = "مرد"
+        };
+        isCreateDialogOpen = true;
+    }
+
+    private void OpenEditDialog(StudentDto student)
+    {
+        updateModel = new UpdateStudentDto
+        {
+            Id = student.Id,
+            FullName = student.FullName,
+            FatherName = student.FatherName,
+            PhoneNumber = student.PhoneNumber,
+            StudentCode = student.StudentCode,
+            GradeLevel = student.GradeLevel,
+            FieldOfStudy = student.FieldOfStudy,
+            SchoolId = student.SchoolId,
+            ConsultantId = student.ConsultantId,
+            IsActive = student.IsActive
+        };
+        isEditDialogOpen = true;
+    }
+
+    private void OpenAssignDialog(StudentDto student)
+    {
+        assignStudentName = student.FullName;
+        assignModel = new AssignStudentDto
+        {
+            StudentId = student.Id,
+            SchoolId = student.SchoolId,
+            ConsultantId = student.ConsultantId
+        };
+        isAssignDialogOpen = true;
+    }
+
+    private async Task SaveCreateStudent()
+    {
+        if (string.IsNullOrWhiteSpace(createModel.FullName) || string.IsNullOrWhiteSpace(createModel.NationalCode) || string.IsNullOrWhiteSpace(createModel.Password))
+        {
+            snackBar.Add("نام، کد ملی و کلمه عبور الزامی است.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/students", createModel);
+            var apiRes = await res.ParseApiResponseAsync<StudentDto>();
+            if (apiRes.Success)
+            {
+                snackBar.Add("دانش‌آموز جدید با موفقیت ثبت شد.", Severity.Success);
+                isCreateDialogOpen = false;
+                await LoadStudents();
+            }
+            else
+            {
+                snackBar.Add(apiRes.Message ?? "خطا در ثبت دانش‌آموز", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطای سیستمی: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveUpdateStudent()
+    {
+        if (string.IsNullOrWhiteSpace(updateModel.FullName))
+        {
+            snackBar.Add("نام دانش‌آموز الزامی است.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/students/{updateModel.Id}", updateModel);
+            var apiRes = await res.ParseApiResponseAsync<bool>();
+            if (apiRes.Success)
+            {
+                snackBar.Add("اطلاعات دانش‌آموز به‌روزرسانی شد.", Severity.Success);
+                isEditDialogOpen = false;
+                await LoadStudents();
+            }
+            else
+            {
+                snackBar.Add(apiRes.Message ?? "خطا در به‌روزرسانی", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطای سیستمی: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveAssignStudent()
+    {
+        isSaving = true;
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/students/{assignModel.StudentId}/assign", assignModel);
+            var apiRes = await res.ParseApiResponseAsync<bool>();
+            if (apiRes.Success)
+            {
+                snackBar.Add("انتساب با موفقیت انجام شد.", Severity.Success);
+                isAssignDialogOpen = false;
+                await LoadStudents();
+            }
+            else
+            {
+                snackBar.Add(apiRes.Message ?? "خطا در انتساب", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteStudent(StudentDto student)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف دانش‌آموز «{student.FullName}» و تمام سوابق مربوطه اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                var res = await _http.DeleteAsync($"api/students/{student.Id}");
+                var apiRes = await res.ParseApiResponseAsync<bool>();
+                if (apiRes.Success)
+                {
+                    snackBar.Add("دانش‌آموز با موفقیت حذف شد.", Severity.Success);
+                    await LoadStudents();
+                }
+                else
+                {
+                    snackBar.Add(apiRes.Message ?? "خطا در حذف", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                snackBar.Add($"خطا: {ex.Message}", Severity.Error);
             }
         }
     }
 
-    public async Task<bool> OpenDialog(string txt)
+    private async Task RefreshStudents()
     {
-        var parameters = new DialogParameters();
-        parameters.Add("mytext", txt);
-        var dialog = await Dialog.ShowAsync<Alert_qoustion>("", parameters);
-        var result = await dialog.Result;
-        return !result.Canceled;
+        await LoadSchoolsAndConsultants();
+        await LoadStudents();
+        snackBar.Add("لیست دانش‌آموزان به‌روزرسانی شد.", Severity.Info);
     }
 
-    void GoToBack()
+    private void OpenBulkAssignDialog()
     {
-        nav.NavigateTo("/Home");
+        if (selectedStudents == null || !selectedStudents.Any())
+        {
+            snackBar.Add("لطفاً حداقل یک دانش‌آموز را انتخاب فرمایید.", Severity.Warning);
+            return;
+        }
+
+        bulkUpdateSchool = false;
+        bulkSelectedSchoolId = null;
+        bulkUpdateConsultant = true;
+        bulkSelectedConsultantId = null;
+        isBulkAssignDialogOpen = true;
+    }
+
+    private async Task SaveBulkAssign()
+    {
+        if (selectedStudents == null || !selectedStudents.Any()) return;
+        if (!bulkUpdateSchool && !bulkUpdateConsultant)
+        {
+            snackBar.Add("حداقل یکی از گزینه‌های تغییر مدرسه یا تغییر مشاور را انتخاب نمایید.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var req = new BulkAssignStudentsDto
+            {
+                StudentIds = selectedStudents.Select(s => s.Id).ToList(),
+                UpdateSchool = bulkUpdateSchool,
+                SchoolId = bulkSelectedSchoolId,
+                UpdateConsultant = bulkUpdateConsultant,
+                ConsultantId = bulkSelectedConsultantId
+            };
+
+            var res = await _http.PostAsJsonAsync("api/students/bulk-assign", req);
+            var apiRes = await res.ParseApiResponseAsync<bool>();
+            if (apiRes.Success)
+            {
+                snackBar.Add(apiRes.Message ?? "انتساب دسته‌جمعی با موفقیت انجام شد.", Severity.Success);
+                isBulkAssignDialogOpen = false;
+                selectedStudents.Clear();
+                await LoadStudents();
+            }
+            else
+            {
+                snackBar.Add(apiRes.Message ?? "خطا در انتساب دسته‌جمعی", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task BulkDeleteStudents()
+    {
+        if (selectedStudents == null || !selectedStudents.Any())
+        {
+            snackBar.Add("هیچ دانش‌آموزی انتخاب نشده است.", Severity.Warning);
+            return;
+        }
+
+        var count = selectedStudents.Count;
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف دسته‌جمعی {count} دانش‌آموز انتخاب‌شده و کلیه سوابق مربوطه اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            isSaving = true;
+            try
+            {
+                var req = new BulkDeleteStudentsDto
+                {
+                    StudentIds = selectedStudents.Select(s => s.Id).ToList()
+                };
+
+                var res = await _http.PostAsJsonAsync("api/students/bulk-delete", req);
+                var apiRes = await res.ParseApiResponseAsync<bool>();
+                if (apiRes.Success)
+                {
+                    snackBar.Add(apiRes.Message ?? $"{count} دانش‌آموز با موفقیت حذف شدند.", Severity.Success);
+                    selectedStudents.Clear();
+                    await LoadStudents();
+                }
+                else
+                {
+                    snackBar.Add(apiRes.Message ?? "خطا در حذف دسته‌جمعی", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+            }
+            finally
+            {
+                isSaving = false;
+            }
+        }
     }
 }

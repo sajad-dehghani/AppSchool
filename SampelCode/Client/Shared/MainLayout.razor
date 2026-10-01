@@ -1,0 +1,149 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@using NovinApp.Client.Service
+@inject NavigationManager Navigation
+@inject UserProfileStateService UserProfileState
+@implements IDisposable
+
+<MudThemeProvider Theme="@_currentTheme" IsDarkMode="@_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudRTLProvider RightToLeft="true">
+
+    <MudLayout>
+
+        <!-- Top AppBar -->
+        <MudAppBar Elevation="1" Color="Color.Primary" Class="px-2 px-sm-4">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                           Color="Color.Inherit"
+                           Edge="Edge.Start"
+                           OnClick="ToggleDrawer" />
+
+            <div class="d-flex align-center ms-2">
+                <MudAvatar Color="Color.Surface" Size="Size.Medium" Class="me-2 d-none d-sm-flex" Style="color: var(--mud-palette-primary); font-weight: 900;">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoStories" Size="Size.Small" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold" Style="font-size: 1.05rem;">
+                        سامانه مشاور نوین
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="d-none d-md-block" Style="opacity: 0.85; font-size: 0.72rem; line-height: 1;">
+                        هدایت تحصیلی و پایش هوشمند آزمون‌ها
+                    </MudText>
+                </div>
+            </div>
+
+            <MudSpacer />
+
+            @* پیام خوش‌آمدگویی کاربر در نوار بالا (صفحات تبلت و دسکتاپ) *@
+            @if (UserProfileState.IsLoaded && UserProfileState.CurrentUser != null)
+            {
+                <div class="d-none d-sm-flex align-center me-3">
+                    <MudChip T="string" Variant="Variant.Text" Color="Color.Inherit" Size="Size.Small" Icon="@Icons.Material.Filled.Person">
+                        @(UserProfileState.CurrentUser?.fname ?? "کاربر")
+                    </MudChip>
+                </div>
+            }
+
+            @* سوئیچ حالت شب و روز *@
+            <MudTooltip Text="@(_isDarkMode ? "تغییر به حالت روشن" : "تغییر به حالت تاریک")" Arrow="true">
+                <MudToggleIconButton @bind-Toggled="@_isDarkMode"
+                                     Icon="@Icons.Material.Outlined.DarkMode"
+                                     Color="Color.Inherit"
+                                     ToggledIcon="@Icons.Material.Outlined.LightMode"
+                                     ToggledColor="Color.Warning" />
+            </MudTooltip>
+
+            @* منوی حساب کاربری *@
+            <MudMenu Color="Color.Inherit" Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Class="ms-1">
+                <ActivatorContent>
+                    @if (!string.IsNullOrEmpty(UserProfileState.CurrentUser?.pic))
+                    {
+                        <MudAvatar Size="Size.Small" Style="border: 2px solid rgba(255,255,255,0.85); cursor: pointer;">
+                            <MudImage Src="@UserProfileState.CurrentUser.pic" ObjectFit="ObjectFit.Cover" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" />
+                    }
+                </ActivatorContent>
+                <ChildContent>
+                    <div class="px-4 py-2 border-b">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">
+                            @(UserProfileState.CurrentUser?.fname ?? "کاربر محترم")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            نقش: @(UserProfileState.CurrentUser?.Rool ?? "کاربر سامانه")
+                        </MudText>
+                    </div>
+                    <MudMenuItem Icon="@Icons.Material.Filled.AccountBox" Href="/Profile">
+                        اطلاعات حساب کاربری
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.LockReset" Href="/Frm_Pass">
+                        تغییر کلمه عبور
+                    </MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error" Href="/logout">
+                        خروج از سامانه
+                    </MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+        </MudAppBar>
+
+        <!-- Sidebar Drawer (Responsive for Mobile & Desktop) -->
+        <MudDrawer @bind-Open="_drawerOpen"
+                   Elevation="2"
+                   Width="290px"
+                   Breakpoint="Breakpoint.Lg"
+                   Variant="DrawerVariant.Responsive"
+                   ClipMode="DrawerClipMode.Always">
+
+            <NavMenu />
+
+        </MudDrawer>
+
+        <!-- Main Content Area -->
+        <MudMainContent Class="pb-12">
+            <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 px-2 px-sm-4 px-md-6 fade-in">
+                @Body
+            </MudContainer>
+        </MudMainContent>
+
+    </MudLayout>
+
+</MudRTLProvider>
+
+@code {
+    private bool _isDarkMode = false;
+    private bool _drawerOpen = true;
+    private MudTheme _currentTheme = AppTheme.CreateTheme();
+
+    void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserProfileState.OnChange += StateHasChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // State refresh on navigation
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        UserProfileState.OnChange -= StateHasChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

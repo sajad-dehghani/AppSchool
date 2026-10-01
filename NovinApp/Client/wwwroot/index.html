@@ -6,55 +6,220 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>سامانه مشاور نوین</title>
     <base href="/" />
+
+    <!-- پیش‌بارگذاری هوشمند منابع حیاتی برای به حداکثر رساندن سرعت لود اولیه -->
+    <link rel="preload" href="_framework/blazor.webassembly.js" as="script" />
+    <link rel="preload" href="assets/MudBlazor.min.css" as="style" />
+    <link rel="preload" href="style.css" as="style" />
+
     <link href="css/app.css" rel="stylesheet" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="NovinApp.Client.styles.css" rel="stylesheet" />
     <link href="assets/MudBlazor.min.css" rel="stylesheet" />
     <link href="style.css" rel="stylesheet" />
-    <link href="loading.css" rel="stylesheet" />
 </head>
 
 <body>
     <div id="app">
         <style>
-            @keyframes slide {
-                0% {
-                    transform: translateX(-25%);
-                }
-
-                100% {
-                    transform: translateX(25%);
-                }
+            .app-splash-wrapper {
+                position: fixed;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #f0f6ff 0%, #e1effe 50%, #f8fbff 100%);
+                font-family: 'Vazirmatn', 'Shabnam', system-ui, -apple-system, sans-serif;
+                z-index: 99999;
+                direction: rtl;
+                overflow: hidden;
             }
 
-            .mud-wasm {
-                animation: slide 3s ease-in-out infinite alternate;
-                background-image: linear-gradient(-60deg,#e2e2e2 50%,#f3faff 50%);
-                bottom: 0;
-                left: -50%;
-                opacity: .5;
-                position: fixed;
-                right: -50%;
-                top: 0;
-                z-index: -1
+            .splash-ambient-circle {
+                position: absolute;
+                border-radius: 50%;
+                filter: blur(80px);
+                opacity: 0.5;
+                pointer-events: none;
             }
 
-            .mud-wasm-cont {
-                left: 50%;
-                padding: 10vmin;
-                position: fixed;
+            .ambient-1 {
+                width: 320px;
+                height: 320px;
+                background: rgba(37, 99, 235, 0.25);
+                top: 15%;
+                left: 20%;
+                animation: floatAmb 8s ease-in-out infinite alternate;
+            }
+
+            .ambient-2 {
+                width: 380px;
+                height: 380px;
+                background: rgba(59, 130, 246, 0.2);
+                bottom: 15%;
+                right: 20%;
+                animation: floatAmb 10s ease-in-out infinite alternate-reverse;
+            }
+
+            @keyframes floatAmb {
+                0% { transform: translate(0, 0) scale(1); }
+                100% { transform: translate(30px, -30px) scale(1.1); }
+            }
+
+            .splash-card {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 40px 48px;
+                background: rgba(255, 255, 255, 0.78);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border-radius: 28px;
+                border: 1px solid rgba(255, 255, 255, 0.9);
+                box-shadow: 0 20px 40px -15px rgba(37, 99, 235, 0.12),
+                            0 0 0 1px rgba(219, 234, 254, 0.8);
                 text-align: center;
-                top: 50%;
-                transform: translate(-50%,-50%)
+                max-width: 90vw;
+                width: 380px;
+                animation: splashFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+
+            @keyframes splashFadeIn {
+                from { opacity: 0; transform: translateY(12px) scale(0.97); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+
+            .splash-icon-box {
+                position: relative;
+                width: 76px;
+                height: 76px;
+                margin-bottom: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .splash-icon-bg {
+                position: absolute;
+                inset: 0;
+                border-radius: 22px;
+                background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                box-shadow: 0 12px 24px -6px rgba(37, 99, 235, 0.45);
+                transform: rotate(-4deg);
+                animation: iconPulse 3s ease-in-out infinite alternate;
+            }
+
+            @keyframes iconPulse {
+                0% { transform: rotate(-4deg) scale(1); }
+                100% { transform: rotate(4deg) scale(1.04); }
+            }
+
+            .splash-icon-svg {
+                position: relative;
+                z-index: 2;
+                color: #ffffff;
+                width: 38px;
+                height: 38px;
+            }
+
+            .splash-title {
+                font-size: 1.45rem;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0 0 6px 0;
+                letter-spacing: -0.02em;
+            }
+
+            .splash-title span {
+                background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .splash-subtitle {
+                font-size: 0.86rem;
+                color: #64748b;
+                margin: 0 0 24px 0;
+                font-weight: 500;
+            }
+
+            /* Progress Bar */
+            .splash-progress-track {
+                width: 100%;
+                height: 6px;
+                background: #e2e8f0;
+                border-radius: 999px;
+                overflow: hidden;
+                position: relative;
+                margin-bottom: 12px;
+            }
+
+            .splash-progress-fill {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                width: 45%;
+                background: linear-gradient(90deg, #3b82f6, #2563eb, #60a5fa);
+                border-radius: 999px;
+                animation: progressMove 1.6s ease-in-out infinite;
+            }
+
+            @keyframes progressMove {
+                0% { left: -45%; width: 30%; }
+                50% { left: 30%; width: 55%; }
+                100% { left: 100%; width: 30%; }
+            }
+
+            .splash-status-text {
+                font-size: 0.78rem;
+                color: #94a3b8;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .splash-pulse-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #2563eb;
+                animation: dotBlink 1.2s infinite ease-in-out;
+            }
+
+            @keyframes dotBlink {
+                0%, 100% { opacity: 0.3; transform: scale(0.8); }
+                50% { opacity: 1; transform: scale(1.2); }
             }
         </style>
 
-        <div style="height:100%;width:100%;margin:0;position:fixed;">
-            <div class="mud-wasm"></div>
-            <div class="mud-wasm" style="animation-direction:alternate-reverse;animation-duration:4s;"></div>
-            <div class="mud-wasm" style="animation-duration:5s;"></div>
-            <div class="mud-wasm-cont ">
-                <img src="img/logo.png" style="height:100%;width:100%" />
+        <div class="app-splash-wrapper">
+            <div class="splash-ambient-circle ambient-1"></div>
+            <div class="splash-ambient-circle ambient-2"></div>
+
+            <div class="splash-card">
+                <div class="splash-icon-box">
+                    <div class="splash-icon-bg"></div>
+                    <svg class="splash-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+                        <path d="M6 6h10"></path>
+                        <path d="M6 10h10"></path>
+                    </svg>
+                </div>
+
+                <h1 class="splash-title">سامانه <span>مشاور نوین</span></h1>
+                <p class="splash-subtitle">پلتفرم هوشمند مدیریت تحصیلی و کنکور</p>
+
+                <div class="splash-progress-track">
+                    <div class="splash-progress-fill"></div>
+                </div>
+
+                <div class="splash-status-text">
+                    <span class="splash-pulse-dot"></span>
+                    <span>در حال بارگذاری و بهینه‌سازی سامانه...</span>
+                </div>
             </div>
         </div>
     </div>
@@ -69,6 +234,76 @@
     <script src="assets/MudBlazor.min.js"></script>
     <script src="CKEditor/ckeditor.js"></script>
     <script src="CKEditor/CKEditorInterop.js"></script>
+    <script>
+        window.initBackgroundCanvas = function () {
+            const canvas = document.getElementById('bg-network-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            let width = canvas.width = window.innerWidth;
+            let height = canvas.height = window.innerHeight;
+
+            window.addEventListener('resize', () => {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            });
+
+            const numPoints = Math.floor((width * height) / 22000);
+            const points = [];
+
+            for (let i = 0; i < numPoints; i++) {
+                points.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 0.45,
+                    vy: (Math.random() - 0.5) * 0.45,
+                    radius: Math.random() * 1.5 + 1
+                });
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, width, height);
+
+                // ترسیم و حرکت نقاط
+                for (let i = 0; i < points.length; i++) {
+                    const p = points[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0) p.x = width;
+                    if (p.x > width) p.x = 0;
+                    if (p.y < 0) p.y = height;
+                    if (p.y > height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(37, 99, 235, 0.45)';
+                    ctx.fill();
+
+                    // اتصال نقاط نزدیک به هم
+                    for (let j = i + 1; j < points.length; j++) {
+                        const p2 = points[j];
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < 130) {
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.strokeStyle = `rgba(37, 99, 235, ${0.20 * (1 - dist / 130)})`;
+                            ctx.lineWidth = 0.9;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                requestAnimationFrame(draw);
+            }
+
+            draw();
+        };
+    </script>
 </body>
 
 </html>

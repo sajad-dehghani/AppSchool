@@ -1,0 +1,54 @@
+﻿@page "/payment-result"
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudCard Class="mt-8">
+        <MudCardContent>
+            @if (bool.Parse( IsSuccess))
+            {
+                <MudAlert Severity="Severity.Success">
+                    <MudText>@Message</MudText>
+                    @if (int.Parse(RefId) > 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            کد پیگیری: @RefId
+                        </MudText>
+                    }
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Error">
+                    <MudText>@Message</MudText>
+                </MudAlert>
+            }
+            
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Class="mt-4"
+                       Href="/purchase">
+                بازگشت به صفحه خرید
+            </MudButton>
+            
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       FullWidth="true"
+                       Class="mt-2"
+                       Href="/">
+                رفتن به صفحه اصلی
+            </MudButton>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] [SupplyParameterFromQuery] public string RefId { get; set; } = "0";
+    [Parameter] [SupplyParameterFromQuery] public string IsSuccess { get; set; } = "False";
+    [Parameter] [SupplyParameterFromQuery] public string Message { get; set; } = string.Empty;
+    
+    private bool _isSuccess => IsSuccess.ToLower() == "true";
+    private long _refId => long.TryParse(RefId, out var id) ? id : 0;
+}

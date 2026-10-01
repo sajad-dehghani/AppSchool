@@ -1,17 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using NovinApp.Server.Helpers;
 using NovinApp.Server.MyContext;
 using NovinApp.Shared;
+using NovinApp.Shared.Constants;
 using NovinApp.Shared.Login;
 
 namespace NovinApp.Server.Controllers
@@ -22,13 +18,11 @@ namespace NovinApp.Server.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly MyAppContext _context;
-        private readonly HttpClient _httpClient;
 
-        public AuthController(IConfiguration configuration, MyAppContext context, HttpClient httpClient)
+        public AuthController(IConfiguration configuration, MyAppContext context)
         {
             _configuration = configuration;
             _context = context;
-            _httpClient = httpClient;
         }
 
         [HttpPost("Login")]
@@ -40,29 +34,34 @@ namespace NovinApp.Server.Controllers
             var trimmedUsername = userInfo.Username.Trim();
             var trimmedPassword = userInfo.Password.Trim();
 
-            var dev = await _context.User
-                .FirstOrDefaultAsync(x => x.code_meli == trimmedUsername && x.active == true);
+            // جستجو در جدول User با کد ملی
+            var user = await _context.User.FirstOrDefaultAsync(x =>
+                x.code_meli == trimmedUsername && x.active == true);
 
-            if (dev == null || !PasswordHelper.VerifyPassword(trimmedPassword, dev.pass))
+            if (user == null)
                 return BadRequest("نام کاربری یا کلمه عبور اشتباه است یا حساب غیرفعال می‌باشد");
 
-            // ارتقای خودکار پسوردهای متنی قدیمی به هش امن PBKDF2 در هنگام اولین لاگین موفق
-            if (!PasswordHelper.IsHashed(dev.pass))
+            // بررسی رمز عبور
+            if (!PasswordHelper.VerifyPassword(trimmedPassword, user.pass))
+                return BadRequest("نام کاربری یا کلمه عبور اشتباه است");
+
+            // اگر رمز هنوز هش نشده، هش کن و ذخیره کن
+            if (!PasswordHelper.IsHashed(user.pass))
             {
-                dev.pass = PasswordHelper.HashPassword(trimmedPassword);
+                user.pass = PasswordHelper.HashPassword(trimmedPassword);
                 await _context.SaveChangesAsync();
             }
 
-            var token = BuildToken(dev);
-
+            var token = BuildToken(user);
             return Ok(token);
         }
 
-        /// <summary>
-        /// ساخت JWT Token با کلیم‌های کامل
-        /// </summary>
         private UserToken BuildToken(User user)
         {
+            // نرمال‌سازی نقش
+            var normalizedRole = UserRoles.NormalizeRole(user.Rool ?? "");
+
+            // ساخت claims
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -70,14 +69,21 @@ namespace NovinApp.Server.Controllers
                 new Claim(ClaimTypes.Name, user.fname ?? user.code_meli ?? user.Id.ToString()),
                 new Claim("FullName", user.fname ?? ""),
                 new Claim("NationalCode", user.code_meli ?? ""),
-                new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Rool) ? "دانش آموز" : user.Rool),
-                new Claim("Role", string.IsNullOrWhiteSpace(user.Rool) ? "دانش آموز" : user.Rool)
+                new Claim(ClaimTypes.Role, normalizedRole),
+                new Claim("Role", normalizedRole),
+                new Claim("RolePersian", UserRoles.GetPersianTitle(normalizedRole))
             };
+
+            // افزودن SchoolId و MoshaverId از User
+            if (user.Id_School.HasValue)
+                claims.Add(new Claim("SchoolId", user.Id_School.Value.ToString()));
+
+            if (user.Id_Moshaver.HasValue)
+                claims.Add(new Claim("ConsultantId", user.Id_Moshaver.Value.ToString()));
 
             var jwtKey = _configuration["jwt:Key"] ?? "NovinAppSecretKeyMustBeAtLeast32CharsLong12345!";
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
             DateTime expireTime = DateTime.UtcNow.AddHours(8);
 
             var jwtToken = new JwtSecurityToken(
@@ -88,12 +94,10 @@ namespace NovinApp.Server.Controllers
                 signingCredentials: creds
             );
 
-            string tokenString = new JwtSecurityTokenHandler().WriteToken(jwtToken);
-
             return new UserToken
             {
                 StatusCode = System.Net.HttpStatusCode.OK,
-                token = tokenString,
+                token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
                 ExpireTime = expireTime
             };
         }

@@ -1,0 +1,651 @@
+﻿@page "/NewQuestion"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared
+@inject IJSRuntime JsRuntime
+@inject MudBlazor.ISnackbar snackBar
+@inject NavigationManager nav
+@inject IDialogService Dialog
+@inject HttpClient _httpClient
+@implements IDisposable
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+
+<MudItem Class="pa-4" md="12" xs="12">
+    <MudGrid>
+
+        <MudItem md="6" xs="12">
+            <MudText Class="mt-2" Typo="Typo.h4">سوال جدید</MudText>
+        </MudItem>
+        <MudItem md="6" xs="12">
+            <MudCardActions Class="d-flex justify-end">
+                <MudButton OnClick="Save" Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Class="ml-2"
+                           ButtonType="ButtonType.Submit"
+                           Size="Size.Large">
+                    @(Cls_global.IsEdit ? "بروزرسانی" : "ثبت")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           OnClick="GoToBack"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           Size="Size.Large">
+                    انصراف
+                </MudButton>
+            </MudCardActions>
+        </MudItem>
+    </MudGrid>
+</MudItem>
+<MudDivider DividerType="DividerType.Inset" />
+
+<MudPaper Class="pa-2 mt-3">
+    <MudItem md="12" xs="12">
+        <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+            <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">مشخصات سوال</MudText>
+        </MudPaper>
+        <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+        </MudPaper>
+    </MudItem>
+
+    <MudGrid Class="pa-4">
+
+        <MudItem md="3" xs="12">
+            <MudSelect T="string"
+                       Style="text-align:right"
+                       Variant="Variant.Outlined"
+                       Label="نوع تست "
+                       @bind-Value="@data.Groups"
+                       For="@(() => data.Groups)"
+                       Margin="Margin.Dense">
+                <MudSelectItem Value=@("گاردنر")>گاردنر</MudSelectItem>
+                <MudSelectItem Value=@("کتل")>کتل</MudSelectItem>
+                <MudSelectItem Value=@("نئو")>نئو</MudSelectItem>
+                <MudSelectItem Value=@("کلیفتون")>کلیفتون</MudSelectItem>
+                <MudSelectItem Value=@("هالند")>هالند</MudSelectItem>
+                <MudSelectItem Value=@("تعهد")>تعهد</MudSelectItem>
+                <MudSelectItem Value=@("پرسشنامه")>پرسشنامه</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem md="2" xs="12">
+            <MudNumericField Style="text-align:right"
+                             T="int"
+                             Min="1" Max="6"
+                             Variant="Variant.Outlined"
+                             Label="تعداد گزینه ها"
+                             @bind-Value="@data.NumberOfOptions"
+                             For="@(() => data.NumberOfOptions)"
+                             Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem md="2" xs="12">
+            <MudSelect T="string"
+                       Style="text-align:right"
+                       Variant="Variant.Outlined"
+                       Label="محدودیت جنسیتی"
+                       @bind-Value="@data.Gender_specific"
+                       For="@(() => data.Gender_specific)"
+                       Margin="Margin.Dense">
+                <MudSelectItem Value=@("هر دو گروه")>هر دو گروه</MudSelectItem>
+                <MudSelectItem Value=@("خانم ها")>خانم ها</MudSelectItem>
+                <MudSelectItem Value=@("آقا ها")>آقا ها</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem md="5" xs="12">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="tag-container">
+                <MudAutocomplete T="string"
+                                 Label="افزودن برچسب..."
+                                 @bind-Value="_newTag"
+                                 Immediate="true"
+                                 SearchFunc="@Search1"
+                                 CoerceText="true"
+                                 CoerceValue="true"
+                                 AdornmentColor="Color.Primary" AdornmentIcon="@Icons.Material.Filled.BookmarkAdd"
+                                 SelectValueOnTab="true"
+                                 Margin="Margin.Dense"
+                                 ResetValueOnEmptyText="true"
+                                 Variant="Variant.Outlined"
+                                 OnAdornmentClick="@AddTagFromInput"
+                                 OnBlur="@AddTagFromInput"
+                                 Clearable="true"
+                                 Class="tag-autocomplete"
+                                 Style="min-width: 150px;">
+                    <ProgressIndicatorInPopoverTemplate>
+                        <MudList T="string" ReadOnly>
+                            <MudListItem>در حال جستجو...</MudListItem>
+                        </MudList>
+                    </ProgressIndicatorInPopoverTemplate>
+                </MudAutocomplete>
+
+            </MudStack>
+        </MudItem>
+        <MudChipSet T="string" AllClosable="true">
+            @foreach (var value in Tags)
+            {
+                <MudChip T="string[]" CloseIcon="@Icons.Material.Filled.Cancel" OnClose="@(() => RemoveTag(value))" Variant="Variant.Outlined" Color="Color.Secondary" Text="@value"></MudChip>
+            }
+        </MudChipSet>
+    </MudGrid>
+    <MudItem Class="pa-4" md="12" xs="12">
+        <MudItem md="12" xs="12">
+            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">متن سوال</MudText>
+            </MudPaper>
+            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+            </MudPaper>
+        </MudItem>
+        <CKEditorBlazor Id="QuestionText" @bind-Value=@data.QuestionText
+                        UrlToPostImage="@UploadUrl"></CKEditorBlazor>
+    </MudItem>
+    <MudGrid Class="pa-4">
+        <MudGrid Class="pa-4">
+            @if (data.NumberOfOptions >= 1)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 1</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option1Score"
+                                             For="@(() => data.Option1Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option1Text" @bind-Value=@data.Option1Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+                </MudItem>
+            }
+            @if (data.NumberOfOptions >= 2)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 2</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option2Score"
+                                             For="@(() => data.Option2Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option2Text" @bind-Value=@data.Option2Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+
+                </MudItem>
+            }
+            @if (data.NumberOfOptions >= 3)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 3</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option3Score"
+                                             For="@(() => data.Option3Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option3Text" @bind-Value=@data.Option3Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+                </MudItem>
+            }
+            @if (data.NumberOfOptions >= 4)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 4</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option4Score"
+                                             For="@(() => data.Option4Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option4Text" @bind-Value=@data.Option4Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+
+                </MudItem>
+
+            }
+            @if (data.NumberOfOptions >= 5)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 5</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option5Score"
+                                             For="@(() => data.Option5Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option5Text" @bind-Value=@data.Option5Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+                </MudItem>
+            }
+            @if (data.NumberOfOptions >= 6)
+            {
+                <MudItem xs="12" md="6">
+                    <MudGrid>
+                        <MudItem md="8" xs="12">
+                            <MudPaper Class="mud-theme-primary mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+                                <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">گزینه 6</MudText>
+                            </MudPaper>
+                            <MudPaper Class="mud-theme-primary" Width="100%" Square="false" Height="2px">
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem md="4" xs="12">
+                            <MudNumericField Style="text-align:right"
+                                             T="decimal"
+                                             Min=decimal.Zero
+                                             Format="F1"
+                                             Variant="Variant.Outlined"
+                                             Label="امتیاز"
+                                             @bind-Value="@data.Option6Score"
+                                             For="@(() => data.Option6Score)"
+                                             Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudItem xs="12" md="12">
+                        <CKEditorBlazor Id="Option6Text" @bind-Value=@data.Option6Text UrlToPostImage="@UploadUrl" />
+                    </MudItem>
+
+                </MudItem>
+            }
+
+        </MudGrid>
+
+
+    </MudGrid>
+
+    <MudItem Class="pa-4" md="12" xs="12">
+        <MudTextField Style="text-align:right"
+                      T="string"
+                      Variant="Variant.Outlined"
+                      Label="توضیحات سوال"
+                      @bind-Value="@data.Memo"
+                      For="@(() => data.Memo)"
+                      Margin="Margin.Dense"
+                      Lines="3" />
+    </MudItem>
+
+
+</MudPaper>
+
+
+
+@code {
+
+    private string UploadUrl => $"{nav.BaseUri}api/q/Upload";
+    Question data = new Question();
+    [Parameter] public List<string> Tags { get; set; } = new();
+    [Parameter] public EventCallback<List<string>> TagsChanged { get; set; }
+
+    private string? _newTag;
+
+    #region Tag
+    private readonly string[] _tags =
+    [
+        // حوزه‌های شغلی (۱۸ حوزه کاری)
+        "حوزه دبیری",
+        "حوزه مدیریت",
+        "حوزه علوم پایه",
+        "حوزه هنر",
+        "حوزه مهندسی سازه",
+        "حوزه مهندسی صنعتی",
+        "حوزه الکترونیک و کامپیوتر",
+        "حوزه تربیت بدنی",
+        "حوزه مالی و حسابداری",
+        "حوزه روانشناسی و خدمات اجتماعی",
+        "حوزه روابط عمومی",
+        "حوزه کشاورزی و علوم دامی",
+        "حوزه حقوق و علوم سیاسی",
+        "حوزه خدمات فنی",
+        "حوزه تکنسین فنی",
+        "حوزه درمانی – بالینی",
+        "حوزه تشخیصی – درمانی",
+        "حوزه تکنسین کامپیوتر",
+
+        // شاخه‌های تحصیلی
+        "ریاضی-فیزیک",
+        "علوم تجربی",
+        "علوم انسانی",
+        "هنر",
+        "کشاورزی",
+        "صنعت",
+        "مدیریت و خدمات",
+
+        // هوش‌های چندگانه گاردنر
+        "زبانی-کلامی",
+        "منطقی-ریاضی",
+        "فضایی-تصویری",
+        "بدنی-جنبشی",
+        "موسیقیایی",
+        "میان‌فردی",
+        "درون‌فردی",
+        "طبیعت‌گرا",
+
+        // ابعاد شخصیتی
+        "درون‌گرایی",
+        "برون‌گرایی",
+        "وظیفه‌شناسی",
+        "پشتکار",
+        "انعطاف‌پذیری",
+        "ثبات هیجانی",
+        "اضطراب",
+        "اعتماد به نفس",
+        "تبعیت‌پذیری",
+        "رقابت‌طلبی",
+        "رهبری",
+        "همدلی",
+        "خودآگاهی",
+        "خودتنظیمی",
+
+        // توانمندی‌ها و مهارت‌ها
+        "حل مسئله",
+        "تحلیل‌گری",
+        "تفکر انتقادی",
+        "خلاقیت",
+        "تصمیم‌گیری",
+        "برنامه‌ریزی",
+        "مدیریت زمان",
+        "مهارت ارتباطی",
+        "مهارت کلامی",
+        "مهارت نوشتاری",
+        "مهارت شنیداری",
+        "مهارت مذاکره",
+        "مهارت ارائه",
+        "کار تیمی",
+        "مدیریت تعارض",
+        "دقت و تمرکز",
+        "حافظه",
+        "محاسبات ذهنی",
+        "تجسم سه‌بعدی",
+        "جهت‌یابی فضایی",
+        "هماهنگی چشم و دست",
+        "مهارت‌های حرکتی ظریف",
+        "مهارت‌های حرکتی درشت",
+        "استدلال منطقی",
+        "استدلال انتزاعی",
+        "تفکر سیستمی",
+
+        // علایق و رغبت‌ها
+        "علاقه علمی-پژوهشی",
+        "علاقه فنی-عملی",
+        "علاقه هنری-خلاق",
+        "علاقه اجتماعی-کمک‌رسانی",
+        "علاقه سازمانی-اداری",
+        "علاقه اقتصادی-مالی",
+        "علاقه به تدریس",
+        "علاقه به مطالعه",
+        "علاقه به طبیعت",
+        "علاقه به حیوانات",
+        "علاقه به گیاهان",
+        "علاقه به محیط زیست",
+        "علاقه به ورزش",
+        "علاقه به موسیقی",
+        "علاقه به هنرهای تجسمی",
+        "علاقه به فناوری",
+        "علاقه به کامپیوتر",
+        "علاقه به ریاضیات",
+        "علاقه به ادبیات",
+        "علاقه به تاریخ و جغرافیا",
+        "علاقه به فلسفه",
+        "علاقه به کارهای یدی و ساخت‌وساز",
+        "علاقه به مکانیک و ماشین‌آلات",
+        "علاقه به الکترونیک",
+        "علاقه به پزشکی و سلامت",
+        "علاقه به مشاوره و روانشناسی",
+        "علاقه به حقوق و سیاست",
+        "علاقه به روزنامه‌نگاری",
+        "علاقه به بازی‌های فکری",
+        "علاقه به کارآفرینی",
+
+        // محیط کار / سبک یادگیری
+        "فعالیت انفرادی",
+        "فعالیت گروهی",
+        "محیط آزمایشگاهی",
+        "محیط کارگاهی",
+        "محیط اداری",
+        "محیط باز / فضای آزاد",
+        "محیط هنری",
+        "محیط درمانی",
+        "فعالیت‌های تکراری",
+        "فعالیت‌های متنوع و پویا",
+        "یادگیری عملی",
+        "یادگیری نظری",
+        "یادگیری دیداری",
+        "یادگیری شنیداری",
+        "یادگیری لمسی",
+
+        // درس‌های دوره متوسطه
+        "ریاضی",
+        "فیزیک",
+        "شیمی",
+        "زیست‌شناسی",
+        "زمین‌شناسی",
+        "ادبیات فارسی",
+        "زبان انگلیسی",
+        "عربی",
+        "دین و زندگی",
+        "مطالعات اجتماعی",
+        "تاریخ",
+        "جغرافیا",
+        "هنر",
+        "ورزش",
+        "کار و فناوری",
+        "تفکر و سبک زندگی",
+    ];
+    #endregion
+
+    async Task LoadData()
+    {
+        try
+        {
+            data = await _httpClient.GetFromJsonAsync<Question>($"api/Question/{Cls_global.select_row_id}");
+
+            string[] _tag = data.Tags.Split(';');
+            Tags.Clear();
+
+            foreach (var item in _tag)
+            {
+                if (item != "")
+                {
+                    Tags.Add(item);
+
+                }
+            }
+            await TagsChanged.InvokeAsync(Tags);
+            StateHasChanged();
+
+
+
+            if (data == null)
+            {
+                snackBar.Add("اطلاعات مورد نظر یافت نشد", Severity.Error);
+                nav.NavigateTo("/QuestionsList");
+                return;
+            }
+        }
+        catch
+        {
+            snackBar.Add("خطا در دریافت اطلاعات ", Severity.Error);
+            nav.NavigateTo("/QuestionsList");
+        }
+    }
+
+    async Task Save()
+    {
+        try
+        {
+
+
+            string[] _tag = Tags.ToArray();
+            string tag_ = "";
+            foreach (var item in _tag)
+            {
+                tag_ += item + ";";
+            }
+            data.Tags = tag_;
+
+            HttpResponseMessage response;
+
+            if (Cls_global.IsEdit)
+            {
+                response = await _httpClient.PutAsJsonAsync($"api/Question", data);
+            }
+            else
+            {
+                response = await _httpClient.PostAsJsonAsync("api/Question", data);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                snackBar.Add(Cls_global.IsEdit ? "اطلاعات با موفقیت بروزرسانی شد" : "اطلاعات با موفقیت ثبت شد", Severity.Success);
+
+            }
+            else
+            {
+                snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                snackBar.Add("عملیات با خطا مواجه شد. لطفاً مجدد تلاش کنید", Severity.Error);
+            }
+        }
+        catch
+        {
+
+
+        }
+    }
+
+    private async Task<IEnumerable<string>> Search1(string value, CancellationToken token)
+    {
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return _tags;
+        return _tags.Where(x => x.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Take(10);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        if (Cls_global.IsEdit)
+        {
+            await LoadData();
+
+        }
+        else
+        {
+            data.Groups = "گاردنر";
+            data.NumberOfOptions = 4;
+            data.Gender_specific = "هر دو گروه";
+        }
+    }
+
+    private async Task AddTagFromInput()
+    {
+        if (!string.IsNullOrWhiteSpace(_newTag))
+        {
+            var trimmedTag = _newTag.Trim();
+
+            // بررسی بدون توجه به کوچک/بزرگ بودن حروف
+            if (!Tags.Any(t => t.Equals(trimmedTag, StringComparison.OrdinalIgnoreCase)))
+            {
+                Tags.Add(trimmedTag);
+                _newTag = null;
+                await TagsChanged.InvokeAsync(Tags);
+                StateHasChanged();
+            }
+            else
+            {
+                snackBar.Add("تگ تکراری", Severity.Error);
+                return;
+            }
+        }
+    }
+
+    private async Task RemoveTag(string tag)
+    {
+        Tags.Remove(tag);
+        await TagsChanged.InvokeAsync(Tags);
+        StateHasChanged();
+    }
+
+    void GoToBack()
+    {
+        nav.NavigateTo("/QuestionsList");
+    }
+    private CancellationTokenSource? _cts;
+    public void Dispose()
+    {
+        // ۱. لغو تمام عملیات Async در حال اجرا
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        Cls_global.IsEdit = false;
+        Cls_global.select_row_id = -1;
+
+    }
+}

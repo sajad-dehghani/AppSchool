@@ -1,0 +1,348 @@
+@page "/Products"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject PsychologyTestService testService
+@inject UserProfileStateService UserProfileState
+@inject NavigationManager nav
+@attribute [Authorize]
+
+<MudPaper Elevation="3" Class="pa-4 mb-4" Style="border-radius: 12px; background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%); color: white;">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" Class="ml-2 align-middle" />
+                سامانه آزمون‌های روانشناسی و هدایت تحصیلی نوین
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                ارزیابی علمی استعدادها، شخصیت و رغبت‌سنجی شغلی جهت انتخاب رشته پایه نهم و کنکور سراسری همراه با نظریه هوش مصنوعی
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            @if (isCounselor)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.AssignmentInd" Href="/CounselorReports">
+                    کارنامه دانش‌آموزان من
+                </MudButton>
+            }
+            <MudChip T="string" Color="Color.Surface" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Verified" Class="text-primary">
+                مطابق استانداردهای روان‌سنجی
+            </MudChip>
+        </div>
+    </div>
+</MudPaper>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center my-12">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        <MudText Typo="Typo.subtitle1" Class="ms-3">در حال بارگذاری وضعیت آزمون‌ها...</MudText>
+    </div>
+}
+else
+{
+    <MudGrid Class="mt-2">
+        @* ۱. آزمون هالند *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="4" Class="hover-card h-100 d-flex flex-column" Style="border-radius: 16px; border-top: 5px solid #1976d2;">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Explore" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">آزمون رغبت‌سنجی تحصیلی و شغلی هالند (RIASEC)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">معیار استاندارد انتخاب رشته پایه نهم و کنکور</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (statusDict.TryGetValue(PsychologyTestTypes.Holland, out var s) && s.hasTaken)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">شرکت کرده‌اید</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">آماده آزمون</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="flex-grow-1">
+                    <MudText Typo="Typo.body2" Class="mb-3 text-secondary">
+                        ارزیابی ۶ تیپ شخصیتی و تمایل شغلی (واقع‌گرا، جستجوگر، هنری، اجتماعی، متهور، قراردادی) با استخراج کد ۳ حرفی هالند و پیشنهاد اولویت‌های نهم و دانشگاهی.
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.FormatListNumbered" Color="Color.Default">۲۴ سوال</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer" Color="Color.Default">۱۰ دقیقه</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.AutoAwesome" Color="Color.Secondary">تحلیل هوش مصنوعی</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.PictureAsPdf" Color="Color.Primary">گزارش PDF</MudChip>
+                    </div>
+                </MudCardContent>
+                <MudCardActions Class="pa-4 pt-0">
+                    @if (statusDict.TryGetValue(PsychologyTestTypes.Holland, out var hollandStatus) && hollandStatus.hasTaken)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.Visibility" Href="/Quiz/Holland" FullWidth="true" Size="Size.Large">
+                            مشاهده کارنامه قبلی و تحلیل هوش مصنوعی
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowBack" Href="/Quiz/Holland" FullWidth="true" Size="Size.Large">
+                            شروع آزمون هالند (یک‌بار مجاز)
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* ۲. آزمون هوش‌های چندگانه گاردنر *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="4" Class="hover-card h-100 d-flex flex-column" Style="border-radius: 16px; border-top: 5px solid #2e7d32;">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">آزمون هوش‌های چندگانه گاردنر (Gardner)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">سنجش استعدادهای ۸ گانه ذهنی (نسخه کامل ۸۰ سؤالی)</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (statusDict.TryGetValue(PsychologyTestTypes.Gardner, out var g) && g.hasTaken)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">شرکت کرده‌اید</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">آماده آزمون</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="flex-grow-1">
+                    <MudText Typo="Typo.body2" Class="mb-3 text-secondary">
+                        کشف برجسته‌ترین هوش‌های فردی شامل منطقی-ریاضی، کلامی، دیداری-فضایی، موسیقی، بدنی-جنبشی، میان‌فردی، درون‌فردی و طبیعت‌گرا با راهنمای رشته‌های متناظر.
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.FormatListNumbered" Color="Color.Default">۸۰ سوال استاندارد</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer" Color="Color.Default">۲۰ دقیقه</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.School" Color="Color.Success">هدایت تحصیلی</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.PictureAsPdf" Color="Color.Primary">گزارش PDF</MudChip>
+                    </div>
+                </MudCardContent>
+                <MudCardActions Class="pa-4 pt-0">
+                    @if (statusDict.TryGetValue(PsychologyTestTypes.Gardner, out var gardnerStatus) && gardnerStatus.hasTaken)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.Visibility" Href="/Quiz/Gardner" FullWidth="true" Size="Size.Large">
+                            مشاهده کارنامه قبلی و تحلیل هوش مصنوعی
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.ArrowBack" Href="/Quiz/Gardner" FullWidth="true" Size="Size.Large">
+                            ورود به آزمون ۸۰ سؤالی گاردنر
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* ۳. آزمون پنج عامل بزرگ شخصیت نئو *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="4" Class="hover-card h-100 d-flex flex-column" Style="border-radius: 16px; border-top: 5px solid #7b1fa2;">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Fingerprint" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">آزمون پنج عامل بزرگ شخصیت نئو (NEO-FFI)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">بررسی ثبات هیجانی، وجدان کاری و انگیزش کنکور (۶۰ سؤال)</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (statusDict.TryGetValue(PsychologyTestTypes.NEO, out var n) && n.hasTaken)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">شرکت کرده‌اید</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Outlined">آماده آزمون</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="flex-grow-1">
+                    <MudText Typo="Typo.body2" Class="mb-3 text-secondary">
+                        ارزیابی ۵ عامل کلیدی شخصیت: روان‌رنجوری و اضطراب آزمون (N)، برون‌گرایی (E)، گشودگی به تجربه (O)، توافق‌پذیری (A) و مسئولیت‌پذیری و وجدان (C).
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.FormatListNumbered" Color="Color.Default">۶۰ سوال لیکرت</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer" Color="Color.Default">۱۵ دقیقه</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Speed" Color="Color.Warning">پایش استرس کنکور</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.PictureAsPdf" Color="Color.Primary">گزارش PDF</MudChip>
+                    </div>
+                </MudCardContent>
+                <MudCardActions Class="pa-4 pt-0">
+                    @if (statusDict.TryGetValue(PsychologyTestTypes.NEO, out var neoStatus) && neoStatus.hasTaken)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.Visibility" Href="/Quiz/NEO" FullWidth="true" Size="Size.Large">
+                            مشاهده کارنامه قبلی و تحلیل هوش مصنوعی
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" EndIcon="@Icons.Material.Filled.ArrowBack" Href="/Quiz/NEO" FullWidth="true" Size="Size.Large">
+                            ورود به آزمون ۶۰ سؤالی نئو
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* ۴. آزمون ۱۶ عاملی کتل *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="4" Class="hover-card h-100 d-flex flex-column" Style="border-radius: 16px; border-top: 5px solid #e65100;">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Warning" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Psychology" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">آزمون ۱۶ عاملی شخصیت کتل (Cattell 16PF)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">سنجش رگه‌های عمقی، پایداری هیجانی و استقلال فردی</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (statusDict.TryGetValue(PsychologyTestTypes.Cattell, out var catStatus) && catStatus.hasTaken)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">شرکت کرده‌اید</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">آماده آزمون</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="flex-grow-1">
+                    <MudText Typo="Typo.body2" Class="mb-3 text-secondary">
+                        ارزیابی جامع ۱۶ بعد شخصیت شامل مردم‌آمیزی، استدلال و هوش، سلطه‌گری، جسارت، خودکفایی، وظیفه‌شناسی و مهار اراده متناسب با هدایت تحصیلی و شغلی.
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.FormatListNumbered" Color="Color.Default">۳۲ سوال استاندارد</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer" Color="Color.Default">۱۰ دقیقه</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.AutoAwesome" Color="Color.Secondary">تحلیل هوش مصنوعی</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.PictureAsPdf" Color="Color.Primary">گزارش PDF</MudChip>
+                    </div>
+                </MudCardContent>
+                <MudCardActions Class="pa-4 pt-0">
+                    @if (statusDict.TryGetValue(PsychologyTestTypes.Cattell, out var cs) && cs.hasTaken)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.Visibility" Href="/Quiz/Cattell" FullWidth="true" Size="Size.Large">
+                            مشاهده کارنامه قبلی و تحلیل هوش مصنوعی
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning" EndIcon="@Icons.Material.Filled.ArrowBack" Href="/Quiz/Cattell" FullWidth="true" Size="Size.Large">
+                            ورود به آزمون کتل (Cattell 16PF)
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        @* ۵. آزمون استعدادیابی کلیفتون *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="4" Class="hover-card h-100 d-flex flex-column" Style="border-radius: 16px; border-top: 5px solid #00838f;">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Stars" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">آزمون استعدادیابی کلیفتون (Clifton Strengths)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">کشف نقاط قوت طلایی و ۳۴ استعداد برتر فردی</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        @if (statusDict.TryGetValue(PsychologyTestTypes.Clifton, out var clifStatus) && clifStatus.hasTaken)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">شرکت کرده‌اید</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">آماده آزمون</MudChip>
+                        }
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="flex-grow-1">
+                    <MudText Typo="Typo.body2" Class="mb-3 text-secondary">
+                        شناسایی پتانسیل‌های ذاتی در ۴ حوزه کلیدی (اجرایی، نفوذ و رهبری، ارتباط‌سازی، تفکر استراتژیک) و معرفی ۵ استعداد برتر طلایی جهت انتخاب رشته.
+                    </MudText>
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.FormatListNumbered" Color="Color.Default">۳۴ استعداد مرجع</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer" Color="Color.Default">۱۲ دقیقه</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.AutoAwesome" Color="Color.Secondary">تحلیل هوش مصنوعی</MudChip>
+                        <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.PictureAsPdf" Color="Color.Primary">گزارش PDF</MudChip>
+                    </div>
+                </MudCardContent>
+                <MudCardActions Class="pa-4 pt-0">
+                    @if (statusDict.TryGetValue(PsychologyTestTypes.Clifton, out var cls) && cls.hasTaken)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.Visibility" Href="/Quiz/Clifton" FullWidth="true" Size="Size.Large">
+                            مشاهده کارنامه قبلی و تحلیل هوش مصنوعی
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Info" EndIcon="@Icons.Material.Filled.ArrowBack" Href="/Quiz/Clifton" FullWidth="true" Size="Size.Large">
+                            ورود به آزمون استعدادیابی کلیفتون
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+<style>
+    .hover-card {
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .hover-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12) !important;
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private bool isCounselor = false;
+    private Dictionary<string, (bool hasTaken, PsychologyTestResult? result)> statusDict = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+
+        var user = UserProfileState.CurrentUser;
+        if (user != null)
+        {
+            isCounselor = user.Rool?.Contains("مشاور") == true || user.Rool?.Contains("مدیر") == true;
+
+            var tests = new[] {
+                PsychologyTestTypes.Holland,
+                PsychologyTestTypes.Gardner,
+                PsychologyTestTypes.NEO,
+                PsychologyTestTypes.Cattell,
+                PsychologyTestTypes.Clifton
+            };
+            foreach (var t in tests)
+            {
+                var status = await testService.CheckStatusAsync(user.Id, t);
+                statusDict[t] = status;
+            }
+        }
+
+        isLoading = false;
+    }
+}

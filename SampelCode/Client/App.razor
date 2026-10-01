@@ -1,0 +1,28 @@
+﻿<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    <LayoutView Layout="@typeof(_Null_Layout)">
+                        <Redirect/>
+                    </LayoutView>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>آدرس اشتباه</PageTitle>
+            <LayoutView Layout="@typeof(_Null)">
+                <div style="position:absolute;top:1vh; left:0.5vh; width:95%; text-align:center">
+                    <img src="/img/animation/404.gif" style="width:30%;height:30%" />
+                    <div class="error mx-auto" style="font-size:202px" data-text="404">404</div>
+                    <p class="lead text-gray-800 mb-5">صفحه یافت نشد</p>
+                    <br />
+                    <p class="text-gray-500 mb-0">کاربر محترم آدرس وارد شده نا معتبر می باشد</p>
+                    <br />
+                    <a href="/Home">&larr; بازگشت به صفحه اصلی</a>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

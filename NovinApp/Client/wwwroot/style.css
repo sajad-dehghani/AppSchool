@@ -719,5 +719,65 @@
 
 /*End Fonts*/
 body {
-    font-family: IRANSansfanum;
+    font-family: IRANSansfanum, Vazirmatn, Tahoma, sans-serif !important;
+    direction: rtl !important;
+    text-align: right !important;
 }
+
+/* RTL Form and MudBlazor Enhancements */
+.mud-input-control, 
+.mud-input-label, 
+.mud-input-slot, 
+.mud-typography, 
+.mud-dialog, 
+.mud-table-root,
+.mud-select {
+    direction: rtl !important;
+    text-align: right !important;
+    font-family: IRANSansfanum, Vazirmatn, Tahoma, sans-serif !important;
+}
+
+.mud-dialog-title {
+    text-align: right !important;
+    direction: rtl !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mud-dialog-actions {
+    justify-content: flex-start !important;
+    gap: 8px;
+    direction: rtl !important;
+}
+
+.mud-input-label-outlined {
+    transform-origin: top right !important;
+}
+
+.mud-input-adornment-start {
+    margin-inline-start: 8px;
+    margin-inline-end: 0;
+}
+
+.mud-input-adornment-end {
+    margin-inline-end: 8px;
+    margin-inline-start: 0;
+}
+
+.mud-table-head .mud-table-cell {
+    text-align: right !important;
+    font-weight: bold;
+}
+
+.mud-table-body .mud-table-cell {
+    text-align: right !important;
+}
+
+.max-w-250 {
+    min-width: 240px;
+}
+
+.max-w-200 {
+    min-width: 190px;
+}

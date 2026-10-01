@@ -1,0 +1,742 @@
+
+@page "/Maping"
+@inject HttpClient _httpClient
+@inject IJSRuntime JS
+@inject NavigationManager navigation
+@inject MudBlazor.ISnackbar snackBar
+@using System.IO
+@using ExcelDataReader
+@using Microsoft.AspNetCore.Components.Forms
+@using NovinApp.Shared
+@using System.Data
+<MudContainer>
+<MudCard>
+    <MudCardContent>
+        <label for="fileinput" class="label-wrapper mud-theme-primary">
+            فایل اکسل را انتخاب کنید
+            <InputFile id="fileinput" OnChange="OnFileSelected" class="custom-file-input" accept=".xlsx,.xls" />
+        </label>
+
+        <MudButton Disabled="@isProcessing"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Upload"
+                   Class="mt-4"
+                   OnClick="UploadExcelAsync">
+                sMessage
+            @if (isProcessing)
+            {
+                  sMessage=  " در حال پردازش... ";
+            }
+            else
+            {
+
+                    sMessage= " اضافه کردن اطلاعات";
+                }
+
+
+        </MudButton>
+
+        @if (isProcessing)
+        {
+            <MudProgressLinear Class="my-6" Color="Color.Primary" Value="@progressPercentage" />
+            <MudText Align="Align.Center">
+                در حال پردازش: @progressPercentage.ToString("F0")% (@processedRows از @totalRows رکورد)
+            </MudText>
+        }
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <MudAlert Severity="@alertSeverity" Class="mt-4">
+                @statusMessage
+            </MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+</MudContainer>
+
+@code {
+    [CascadingParameter] Task<AuthenticationState> AuthenticationState { get; set; }
+
+    private IBrowserFile? selectedFile;
+    private bool isProcessing = false;
+    private double progressPercentage = 0;
+    private int totalRows = 0;
+    private int processedRows = 0;
+    private string statusMessage = "";
+    private string sMessage = "";
+    private Severity alertSeverity = Severity.Info;
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        statusMessage = "";
+    }
+
+    private async Task UploadExcelAsync()
+    {
+        if (selectedFile == null)
+        {
+            snackBar.Add("لطفاً یک فایل انتخاب کنید!", Severity.Warning);
+            return;
+        }
+
+        isProcessing = true;
+        progressPercentage = 0;
+        processedRows = 0;
+        totalRows = 0;
+        statusMessage = "در حال خواندن فایل اکسل...";
+        StateHasChanged();
+
+        try
+        {
+            var students = await ReadExcelAsync(selectedFile);
+
+            if (students.Count == 0)
+            {
+                statusMessage = "فایل اکسل خالی است یا داده‌ای ندارد!";
+                alertSeverity = Severity.Warning;
+                return;
+            }
+
+            statusMessage = "در حال ارسال به سرور...";
+            StateHasChanged();
+
+            var response = await _httpClient.PostAsJsonAsync("api/Report_students/upload-excel", students);
+
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = $"اطلاعات با موفقیت ذخیره شد ({students.Count} رکورد)";
+                alertSeverity = Severity.Success;
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                statusMessage = $"خطا در ارسال داده‌ها: {errorMessage}";
+                alertSeverity = Severity.Error;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"خطایی رخ داد: {ex.Message}";
+            alertSeverity = Severity.Error;
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+    private float SafeFloat(object? value, float defaultValue = 0f)
+    {
+        if (value == null) return defaultValue;
+        var str = value.ToString()?.Trim();
+        if (string.IsNullOrEmpty(str)) return defaultValue;
+        return float.TryParse(str, out float result) ? result : defaultValue;
+    }
+
+    private long SafeLong(object? value, long defaultValue = 0)
+    {
+        if (value == null) return defaultValue;
+        var str = value.ToString()?.Trim();
+        if (string.IsNullOrEmpty(str)) return defaultValue;
+        return long.TryParse(str, out long result) ? result : defaultValue;
+    }
+
+    private int SafeInt(object? value, int defaultValue = 0)
+    {
+        if (value == null) return defaultValue;
+        var str = value.ToString()?.Trim();
+        if (string.IsNullOrEmpty(str)) return defaultValue;
+        return int.TryParse(str, out int result) ? result : defaultValue;
+    }
+    private async Task<List<Report_students>> ReadExcelAsync(IBrowserFile file)
+    {
+        var students = new List<Report_students>();
+
+        await using var memoryStream = new MemoryStream();
+        await file.OpenReadStream(maxAllowedSize: 100_000_000).CopyToAsync(memoryStream);
+        memoryStream.Position = 0;
+
+        // ثبت reader برای پشتیبانی از xlsx/xls
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+        using var reader = ExcelReaderFactory.CreateReader(memoryStream);
+        var result = reader.AsDataSet(new ExcelDataSetConfiguration
+        {
+            ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = true }
+        });
+
+        var dataTable = result.Tables[0]; // شیت اول
+        totalRows = dataTable.Rows.Count;
+        if (totalRows == 0) return students;
+
+        int rowIndex = 0;
+
+        foreach (DataRow row in dataTable.Rows)
+        {
+            rowIndex++;
+            processedRows = rowIndex;
+
+            var student = new Report_students
+            {
+                lesson1_Name = row[1]?.ToString(),
+
+                lesson1_Percent = SafeFloat(row[2]?.ToString()),
+
+                lesson1_PercentAvarage = SafeFloat(row[3]?.ToString()),
+
+                lesson1_PercentMax = SafeFloat(row[4]?.ToString()),
+
+                lesson1_True = SafeFloat(row[5]?.ToString()),
+
+                lesson1_False = SafeFloat(row[6]?.ToString()),
+
+                lesson1_Blank = SafeFloat(row[7]?.ToString()),
+
+                lesson1_Taraz = SafeFloat(row[8]?.ToString()),
+
+                lesson1_MaxTararz = SafeFloat(row[9]?.ToString()),
+
+                lesson1_PercentMin = SafeFloat(row[10]?.ToString()),
+
+                lesson1_TarazMin = SafeFloat(row[11]?.ToString()),
+
+                lesson1_RankSchool = SafeFloat(row[12]?.ToString()),
+
+                lesson1_RankArea = SafeFloat(row[13]?.ToString()),
+
+                lesson1_RankSex = SafeFloat(row[14]?.ToString()),
+
+                lesson1_RankTotal = SafeFloat(row[15]?.ToString()),
+
+                lesson1_Status = row[16]?.ToString(),
+
+                lesson2_Name = row[17]?.ToString(),
+
+                lesson2_Percent = SafeFloat(row[18]?.ToString()),
+
+                lesson2_PercentAvarage = SafeFloat(row[19]?.ToString()),
+
+                lesson2_PercentMax = SafeFloat(row[20]?.ToString()),
+
+                lesson2_True = SafeFloat(row[21]?.ToString()),
+
+                lesson2_False = SafeFloat(row[22]?.ToString()),
+
+                lesson2_Blank = SafeFloat(row[23]?.ToString()),
+
+                lesson2_Taraz = SafeFloat(row[24]?.ToString()),
+
+                lesson2_MaxTararz = SafeFloat(row[25]?.ToString()),
+
+                lesson2_PercentMin = SafeFloat(row[26]?.ToString()),
+
+                lesson2_TarazMin = SafeFloat(row[27]?.ToString()),
+
+                lesson2_RankSchool = SafeFloat(row[28]?.ToString()),
+
+                lesson2_RankArea = SafeFloat(row[29]?.ToString()),
+
+                lesson2_RankSex = SafeFloat(row[30]?.ToString()),
+
+                lesson2_RankTotal = SafeFloat(row[31]?.ToString()),
+
+                lesson2_Status = row[32]?.ToString(),
+
+                lesson3_Name = row[33]?.ToString(),
+
+                lesson3_Percent = SafeFloat(row[34]?.ToString()),
+
+                lesson3_PercentAvarage = SafeFloat(row[35]?.ToString()),
+
+                lesson3_PercentMax = SafeFloat(row[36]?.ToString()),
+
+                lesson3_True = SafeFloat(row[37]?.ToString()),
+
+                lesson3_False = SafeFloat(row[38]?.ToString()),
+
+                lesson3_Blank = SafeFloat(row[39]?.ToString()),
+
+                lesson3_Taraz = SafeFloat(row[40]?.ToString()),
+
+                lesson3_MaxTararz = SafeFloat(row[41]?.ToString()),
+
+                lesson3_PercentMin = SafeFloat(row[42]?.ToString()),
+
+                lesson3_TarazMin = SafeFloat(row[43]?.ToString()),
+
+                lesson3_RankSchool = SafeFloat(row[44]?.ToString()),
+
+                lesson3_RankArea = SafeFloat(row[45]?.ToString()),
+
+                lesson3_RankSex = SafeFloat(row[46]?.ToString()),
+
+                lesson3_RankTotal = SafeFloat(row[47]?.ToString()),
+
+                lesson3_Status = row[48]?.ToString(),
+
+                lesson4_Name = row[49]?.ToString(),
+
+                lesson4_Percent = SafeFloat(row[50]?.ToString()),
+
+                lesson4_PercentAvarage = SafeFloat(row[51]?.ToString()),
+
+                lesson4_PercentMax = SafeFloat(row[52]?.ToString()),
+
+                lesson4_True = SafeFloat(row[53]?.ToString()),
+
+                lesson4_False = SafeFloat(row[54]?.ToString()),
+
+                lesson4_Blank = SafeFloat(row[55]?.ToString()),
+
+                lesson4_Taraz = SafeFloat(row[56]?.ToString()),
+
+                lesson4_MaxTararz = SafeFloat(row[57]?.ToString()),
+
+                lesson4_PercentMin = SafeFloat(row[58]?.ToString()),
+
+                lesson4_TarazMin = SafeFloat(row[59]?.ToString()),
+
+                lesson4_RankSchool = SafeFloat(row[60]?.ToString()),
+
+                lesson4_RankArea = SafeFloat(row[61]?.ToString()),
+
+                lesson4_RankSex = SafeFloat(row[62]?.ToString()),
+
+                lesson4_RankTotal = SafeFloat(row[63]?.ToString()),
+
+                lesson4_Status = row[64]?.ToString(),
+
+                lesson5_Name = row[65]?.ToString(),
+
+                lesson5_Percent = SafeFloat(row[66]?.ToString()),
+
+                lesson5_PercentAvarage = SafeFloat(row[67]?.ToString()),
+
+                lesson5_PercentMax = SafeFloat(row[68]?.ToString()),
+
+                lesson5_True = SafeFloat(row[69]?.ToString()),
+
+                lesson5_False = SafeFloat(row[70]?.ToString()),
+
+                lesson5_Blank = SafeFloat(row[71]?.ToString()),
+
+                lesson5_Taraz = SafeFloat(row[72]?.ToString()),
+
+                lesson5_MaxTararz = SafeFloat(row[73]?.ToString()),
+
+                lesson5_PercentMin = SafeFloat(row[74]?.ToString()),
+
+                lesson5_TarazMin = SafeFloat(row[75]?.ToString()),
+
+                lesson5_RankSchool = SafeFloat(row[76]?.ToString()),
+
+                lesson5_RankArea = SafeFloat(row[77]?.ToString()),
+
+                lesson5_RankSex = SafeFloat(row[78]?.ToString()),
+
+                lesson5_RankTotal = SafeFloat(row[79]?.ToString()),
+
+                lesson5_Status = row[80]?.ToString(),
+
+                lesson6_Name = row[81]?.ToString(),
+
+                lesson6_Percent = SafeFloat(row[82]?.ToString()),
+
+                lesson6_PercentAvarage = SafeFloat(row[83]?.ToString()),
+
+                lesson6_PercentMax = SafeFloat(row[84]?.ToString()),
+
+                lesson6_True = SafeFloat(row[85]?.ToString()),
+
+                lesson6_False = SafeFloat(row[86]?.ToString()),
+
+                lesson6_Blank = SafeFloat(row[87]?.ToString()),
+
+                lesson6_Taraz = SafeFloat(row[88]?.ToString()),
+
+                lesson6_MaxTararz = SafeFloat(row[89]?.ToString()),
+
+                lesson6_PercentMin = SafeFloat(row[90]?.ToString()),
+
+                lesson6_TarazMin = SafeFloat(row[91]?.ToString()),
+
+                lesson6_RankSchool = SafeFloat(row[92]?.ToString()),
+
+                lesson6_RankArea = SafeFloat(row[93]?.ToString()),
+
+                lesson6_RankSex = SafeFloat(row[94]?.ToString()),
+
+                lesson6_RankTotal = SafeFloat(row[95]?.ToString()),
+
+                lesson6_Status = row[96]?.ToString(),
+
+                lesson7_Name = row[97]?.ToString(),
+
+                lesson7_Percent = SafeFloat(row[98]?.ToString()),
+
+                lesson7_PercentAvarage = SafeFloat(row[99]?.ToString()),
+
+                lesson7_PercentMax = SafeFloat(row[100]?.ToString()),
+
+                lesson7_True = SafeFloat(row[101]?.ToString()),
+
+                lesson7_False = SafeFloat(row[102]?.ToString()),
+
+                lesson7_Blank = SafeFloat(row[103]?.ToString()),
+
+                lesson7_Taraz = SafeFloat(row[104]?.ToString()),
+
+                lesson7_MaxTararz = SafeFloat(row[105]?.ToString()),
+
+                lesson7_PercentMin = SafeFloat(row[106]?.ToString()),
+
+                lesson7_TarazMin = SafeFloat(row[107]?.ToString()),
+
+                lesson7_RankSchool = SafeFloat(row[108]?.ToString()),
+
+                lesson7_RankArea = SafeFloat(row[109]?.ToString()),
+
+                lesson7_RankSex = SafeFloat(row[110]?.ToString()),
+
+                lesson7_RankTotal = SafeFloat(row[111]?.ToString()),
+
+                lesson7_Status = row[112]?.ToString(),
+
+                lesson8_Name = row[113]?.ToString(),
+
+                lesson8_Percent = SafeFloat(row[114]?.ToString()),
+
+                lesson8_PercentAvarage = SafeFloat(row[115]?.ToString()),
+
+                lesson8_PercentMax = SafeFloat(row[116]?.ToString()),
+
+                lesson8_True = SafeFloat(row[117]?.ToString()),
+
+                lesson8_False = SafeFloat(row[118]?.ToString()),
+
+                lesson8_Blank = SafeFloat(row[119]?.ToString()),
+
+                lesson8_Taraz = SafeFloat(row[120]?.ToString()),
+
+                lesson8_MaxTararz = SafeFloat(row[121]?.ToString()),
+
+                lesson8_PercentMin = SafeFloat(row[122]?.ToString()),
+
+                lesson8_TarazMin = SafeFloat(row[123]?.ToString()),
+
+                lesson8_RankSchool = SafeFloat(row[124]?.ToString()),
+
+                lesson8_RankArea = SafeFloat(row[125]?.ToString()),
+
+                lesson8_RankSex = SafeFloat(row[126]?.ToString()),
+
+                lesson8_RankTotal = SafeFloat(row[127]?.ToString()),
+
+                lesson8_Status = row[128]?.ToString(),
+
+                lesson9_Name = row[129]?.ToString(),
+
+                lesson9_Percent = SafeFloat(row[130]?.ToString()),
+
+                lesson9_PercentAvarage = SafeFloat(row[131]?.ToString()),
+
+                lesson9_PercentMax = SafeFloat(row[132]?.ToString()),
+
+                lesson9_True = SafeFloat(row[133]?.ToString()),
+
+                lesson9_False = SafeFloat(row[134]?.ToString()),
+
+                lesson9_Blank = SafeFloat(row[135]?.ToString()),
+
+                lesson9_Taraz = SafeFloat(row[136]?.ToString()),
+
+                lesson9_MaxTararz = SafeFloat(row[137]?.ToString()),
+
+                lesson9_PercentMin = SafeFloat(row[138]?.ToString()),
+
+                lesson9_TarazMin = SafeFloat(row[139]?.ToString()),
+
+                lesson9_RankSchool = SafeFloat(row[140]?.ToString()),
+
+                lesson9_RankArea = SafeFloat(row[141]?.ToString()),
+
+                lesson9_RankSex = SafeFloat(row[142]?.ToString()),
+
+                lesson9_RankTotal = SafeFloat(row[143]?.ToString()),
+
+                lesson9_Status = row[144]?.ToString(),
+
+                lesson10_Name = row[145]?.ToString(),
+
+                lesson10_Percent = SafeFloat(row[146]?.ToString()),
+
+                lesson10_PercentAvarage = SafeFloat(row[147]?.ToString()),
+
+                lesson10_PercentMax = SafeFloat(row[148]?.ToString()),
+
+                lesson10_True = SafeFloat(row[149]?.ToString()),
+
+                lesson10_False = SafeFloat(row[150]?.ToString()),
+
+                lesson10_Blank = SafeFloat(row[151]?.ToString()),
+
+                lesson10_Taraz = SafeFloat(row[152]?.ToString()),
+
+                lesson10_MaxTararz = SafeFloat(row[153]?.ToString()),
+
+                lesson10_PercentMin = SafeFloat(row[154]?.ToString()),
+
+                lesson10_TarazMin = SafeFloat(row[155]?.ToString()),
+
+                lesson10_RankSchool = SafeFloat(row[156]?.ToString()),
+
+                lesson10_RankArea = SafeFloat(row[157]?.ToString()),
+
+                lesson10_RankSex = SafeFloat(row[158]?.ToString()),
+
+                lesson10_RankTotal = SafeFloat(row[159]?.ToString()),
+
+                lesson10_Status = row[160]?.ToString(),
+
+                lesson11_Name = row[161]?.ToString(),
+
+                lesson11_Percent = SafeFloat(row[162]?.ToString()),
+
+                lesson11_PercentAvarage = SafeFloat(row[163]?.ToString()),
+
+                lesson11_PercentMax = SafeFloat(row[164]?.ToString()),
+
+                lesson11_True = SafeFloat(row[165]?.ToString()),
+
+                lesson11_False = SafeFloat(row[166]?.ToString()),
+
+                lesson11_Blank = SafeFloat(row[167]?.ToString()),
+
+                lesson11_Taraz = SafeFloat(row[168]?.ToString()),
+
+                lesson11_MaxTararz = SafeFloat(row[169]?.ToString()),
+
+                lesson11_PercentMin = SafeFloat(row[170]?.ToString()),
+
+                lesson11_TarazMin = SafeFloat(row[171]?.ToString()),
+
+                lesson11_RankSchool = SafeFloat(row[172]?.ToString()),
+
+                lesson11_RankArea = SafeFloat(row[173]?.ToString()),
+
+                lesson11_RankSex = SafeFloat(row[174]?.ToString()),
+
+                lesson11_RankTotal = SafeFloat(row[175]?.ToString()),
+
+                lesson11_Status = row[176]?.ToString(),
+
+                lesson12_Name = row[177]?.ToString(),
+
+                lesson12_Percent = SafeFloat(row[178]?.ToString()),
+
+                lesson12_PercentAvarage = SafeFloat(row[179]?.ToString()),
+
+                lesson12_PercentMax = SafeFloat(row[180]?.ToString()),
+
+                lesson12_True = SafeFloat(row[181]?.ToString()),
+
+                lesson12_False = SafeFloat(row[182]?.ToString()),
+
+                lesson12_Blank = SafeFloat(row[183]?.ToString()),
+
+                lesson12_Taraz = SafeFloat(row[184]?.ToString()),
+
+                lesson12_MaxTararz = SafeFloat(row[185]?.ToString()),
+
+                lesson12_PercentMin = SafeFloat(row[186]?.ToString()),
+
+                lesson12_TarazMin = SafeFloat(row[187]?.ToString()),
+
+                lesson12_RankSchool = SafeFloat(row[188]?.ToString()),
+
+                lesson12_RankArea = SafeFloat(row[189]?.ToString()),
+
+                lesson12_RankSex = SafeFloat(row[190]?.ToString()),
+
+                lesson12_RankTotal = SafeFloat(row[191]?.ToString()),
+
+                lesson12_Status = row[192]?.ToString(),
+
+                lesson13_Name = row[193]?.ToString(),
+
+                lesson13_Percent = SafeFloat(row[194]?.ToString()),
+
+                lesson13_PercentAvarage = SafeFloat(row[195]?.ToString()),
+
+                lesson13_PercentMax = SafeFloat(row[196]?.ToString()),
+
+                lesson13_True = SafeFloat(row[197]?.ToString()),
+
+                lesson13_False = SafeFloat(row[198]?.ToString()),
+
+                lesson13_Blank = SafeFloat(row[199]?.ToString()),
+
+                lesson13_Taraz = SafeFloat(row[200]?.ToString()),
+
+                lesson13_MaxTararz = SafeFloat(row[201]?.ToString()),
+
+                lesson13_PercentMin = SafeFloat(row[202]?.ToString()),
+
+                lesson13_TarazMin = SafeFloat(row[203]?.ToString()),
+
+                lesson13_RankSchool = SafeFloat(row[204]?.ToString()),
+
+                lesson13_RankArea = SafeFloat(row[205]?.ToString()),
+
+                lesson13_RankSex = SafeFloat(row[206]?.ToString()),
+
+                lesson13_RankTotal = SafeFloat(row[207]?.ToString()),
+
+                lesson13_Status = row[208]?.ToString(),
+
+                lesson14_Name = row[209]?.ToString(),
+
+                lesson14_Percent = SafeFloat(row[210]?.ToString()),
+
+                lesson14_PercentAvarage = SafeFloat(row[211]?.ToString()),
+
+                lesson14_PercentMax = SafeFloat(row[212]?.ToString()),
+
+                lesson14_True = SafeFloat(row[213]?.ToString()),
+
+                lesson14_False = SafeFloat(row[214]?.ToString()),
+
+                lesson14_Blank = SafeFloat(row[215]?.ToString()),
+
+                lesson14_Taraz = SafeFloat(row[216]?.ToString()),
+
+                lesson14_MaxTararz = SafeFloat(row[217]?.ToString()),
+
+                lesson14_PercentMin = SafeFloat(row[218]?.ToString()),
+
+                lesson14_TarazMin = SafeFloat(row[219]?.ToString()),
+
+                lesson14_RankSchool = SafeFloat(row[220]?.ToString()),
+
+                lesson14_RankArea = SafeFloat(row[221]?.ToString()),
+
+                lesson14_RankSex = SafeFloat(row[222]?.ToString()),
+
+                lesson14_RankTotal = SafeFloat(row[223]?.ToString()),
+
+                lesson14_Status = row[224]?.ToString(),
+
+                Total_Name = row[225]?.ToString(),
+
+                Total_Percent = SafeFloat(row[226]?.ToString()),
+
+                Total_PercentAvarage = SafeFloat(row[227]?.ToString()),
+
+                Total_PercentMax = SafeFloat(row[228]?.ToString()),
+
+                Total_True = SafeFloat(row[229]?.ToString()),
+
+                Total_False = SafeFloat(row[230]?.ToString()),
+
+                Total_Blank = SafeFloat(row[231]?.ToString()),
+
+                Total_Taraz = SafeFloat(row[232]?.ToString()),
+
+                Total_MaxTararz = SafeFloat(row[233]?.ToString()),
+
+                Total_PercentMin = SafeFloat(row[234]?.ToString()),
+
+                Total_TarazMin = SafeFloat(row[235]?.ToString()),
+
+                Total_RankSchool = SafeFloat(row[236]?.ToString()),
+
+                Total_RankArea = SafeFloat(row[237]?.ToString()),
+
+                Total_RankSex = SafeFloat(row[238]?.ToString()),
+
+                Total_RankTotal = SafeFloat(row[239]?.ToString()),
+
+                Total_Status = row[240]?.ToString(),
+
+                StudentCode = long.Parse(row[241]?.ToString()),
+
+                Student_FatherName = row[242]?.ToString(),
+
+                Student_School_Name = row[243]?.ToString(),
+
+                Student_Region_Name = row[244]?.ToString(),
+
+                Student_FullName = row[245]?.ToString(),
+
+                Student_School_Code = long.Parse(row[246]?.ToString()),
+
+
+                Student_NationalCode = row[247]?.ToString(),
+
+                Student_LevelNameString = row[248]?.ToString(),
+
+                Student_Section_Name = row[249]?.ToString(),
+
+                Pass_school = row[250]?.ToString(),
+
+                Pass_Region = row[251]?.ToString(),
+
+                Pass_Student = row[252]?.ToString(),
+
+                AnswerSheet = row[253]?.ToString(),
+
+                KeySheet = row[254]?.ToString(),
+
+                ExamStatictics_PresentCount = int.Parse(row[255]?.ToString()),
+
+                SchoolStatistics_PresentCount = int.Parse(row[256]?.ToString()),
+
+                GenderStatistics_PresentCount = int.Parse(row[257]?.ToString()),
+
+                RegionStatistics_PresentCount = int.Parse(row[258]?.ToString()),
+
+                ExamName = row[259].ToString(),
+
+                StringName = row[260]?.ToString(),
+
+                tel = row[261]?.ToString(),
+
+                GetWeekness = row[262]?.ToString(),
+
+                GetStrength = row[263]?.ToString(),
+
+                UploadTime = DateTime.Now,
+
+                UploadDescription = "",
+            };
+
+            // بقیه رو کپی کنید (با ایندکس یا نام ستون)
+
+            students.Add(student);
+
+            // بروزرسانی پروگرس هر ۱۰ رکورد
+            if (rowIndex % 10 == 0 || rowIndex == totalRows)
+            {
+                progressPercentage = (double)processedRows / totalRows * 100;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        progressPercentage = 100;
+        await InvokeAsync(StateHasChanged);
+
+        return students;
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationState;
+        if (!authState.User.Identity?.IsAuthenticated ?? true)
+        {
+            navigation.NavigateTo("/login");
+        }
+    }
+}

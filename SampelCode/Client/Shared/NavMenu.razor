@@ -1,0 +1,193 @@
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@using NovinApp.Shared.Constants
+@inject UserProfileStateService UserProfileState
+@inject NavigationManager Navigation
+
+<div class="sidebar-root d-flex flex-column h-100">
+
+    @* ===== کارت اطلاعات کاربر / پروفایل ===== *@
+    @if (UserProfileState.IsLoaded && UserProfileState.Profile != null)
+    {
+        <MudPaper Class="profile-card mb-3" Elevation="0">
+            <div class="d-flex flex-column align-center">
+                <MudBadge Color="Color.Success" Dot="true" Overlap="true" Origin="Origin.BottomLeft" Bordered="true">
+                    @if (!string.IsNullOrEmpty(UserProfileState.Profile.ProfilePictureUrl))
+                    {
+                        <MudAvatar Size="Size.Large" Elevation="4" Style="width: 80px; height: 80px; border: 3px solid rgba(255,255,255,0.9);">
+                            <MudImage Src="@UserProfileState.Profile.ProfilePictureUrl" ObjectFit="ObjectFit.Cover" Alt="@UserProfileState.Profile.FullName" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Size="Size.Large" Color="Color.Surface" Style="width: 80px; height: 80px; border: 3px solid rgba(255,255,255,0.9); color: var(--mud-palette-primary);">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Large" />
+                        </MudAvatar>
+                    }
+                </MudBadge>
+
+                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mt-2 text-white">
+                    @UserProfileState.Profile.FullName
+                </MudText>
+
+                <div class="d-flex flex-wrap justify-center gap-1 mt-2">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Style="background-color: rgba(255,255,255,0.25); color: white;">
+                        @UserProfileState.Profile.RolePersian
+                    </MudChip>
+                    @if (!string.IsNullOrEmpty(UserProfileState.Profile.NationalCode))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="border-color: rgba(255,255,255,0.5); color: white;">
+                            کدملی: @UserProfileState.Profile.NationalCode
+                        </MudChip>
+                    }
+                </div>
+            </div>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="profile-card mb-3" Elevation="0">
+            <div class="d-flex flex-column align-center pa-2">
+                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="72px" Height="72px" Class="mb-2" />
+                <MudSkeleton Width="120px" Height="20px" Class="mb-1" />
+                <MudSkeleton Width="80px" Height="16px" />
+            </div>
+        </MudPaper>
+    }
+
+    @* ===== لیست پیوندهای ناوبری اختصاصی بر اساس نقش کاربر ===== *@
+    <MudPaper Class="pa-2 modern-card flex-grow-1" Elevation="0">
+        <MudNavMenu Class="nav-menu" Dense="true" Rounded="true">
+
+            @* ۱. پیشخوان مشترک *@
+            <MudText Class="nav-section-title">پیشخوان سامانه</MudText>
+            <MudNavLink Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Primary" Href="/Home" Match="NavLinkMatch.All">
+                داشبورد اصلی
+            </MudNavLink>
+
+            @* ۲. منوی مدیر ارشد سیستم (SystemAdmin) *@
+            @if (UserProfileState.IsSystemAdmin)
+            {
+                <MudText Class="nav-section-title mt-2">مدیریت پایه و کاربران</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.LocationCity" IconColor="Color.Info" Href="/Schools">
+                    مدیریت مدارس
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.SupervisorAccount" IconColor="Color.Warning" Href="/Moshaver">
+                    مدیریت مشاوران
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.School" IconColor="Color.Primary" Href="/Students">
+                    مدیریت دانش‌آموزان
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.ManageAccounts" IconColor="Color.Secondary" Href="/Users">
+                    مدیریت کلیه کاربران
+                </MudNavLink>
+
+                <MudText Class="nav-section-title mt-2">آزمون‌ها و کارنامه‌ها</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.Quiz" IconColor="Color.Warning" Href="/Exams">
+                    مدیریت آزمون‌ها و کارنامه
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.CloudUpload" IconColor="Color.Success" Href="/Import">
+                    ایمپورت اکسل (دانش‌آموز / نتایج)
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Info" Href="/StudentReports">
+                    کارنامه‌ها و تحلیل آزمون
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.FormatListNumberedRtl" IconColor="Color.Secondary" Href="/QuestionsList">
+                    بانک سوالات و آزمون‌ها
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">
+                    آزمون‌های روانشناسی
+                </MudNavLink>
+            }
+
+            @* ۳. منوی مدیر مدرسه (SchoolManager) *@
+            @if (UserProfileState.IsSchoolManager)
+            {
+                <MudText Class="nav-section-title mt-2">مدیریت امور مدرسه</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.Quiz" IconColor="Color.Warning" Href="/Exams">
+                    آزمون‌ها و کارنامه‌ها
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.School" IconColor="Color.Primary" Href="/Students">
+                    دانش‌آموزان مدرسه
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.CloudUpload" IconColor="Color.Success" Href="/Import">
+                    ایمپورت اکسل دانش‌آموزان
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Info" Href="/StudentReports">
+                    کارنامه‌های آزمون مدرسه
+                </MudNavLink>
+            }
+
+            @* ۴. منوی مشاور تحصیلی (Consultant) *@
+            @if (UserProfileState.IsConsultant)
+            {
+                <MudText Class="nav-section-title mt-2">کارتابل پایش مشاوره</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.Group" IconColor="Color.Primary" Href="/Students">
+                    دانش‌آموزان من
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.CloudUpload" IconColor="Color.Success" Href="/Import">
+                    ایمپورت اکسل دانش‌آموزان
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.EventNote" IconColor="Color.Success" Href="/StudyPlan">
+                    برنامه‌ریزی کنکور و مطالعه
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.AssignmentInd" IconColor="Color.Secondary" Href="/CounselorReports">
+                    کارتابل ارزیابی روانشناسی
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Info" Href="/StudentReports">
+                    کارنامه‌های دانش‌آموزان من
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">
+                    آزمون‌های روانشناسی
+                </MudNavLink>
+            }
+
+            @* ۵. منوی دانش‌آموز (Student) *@
+            @if (UserProfileState.IsStudent)
+            {
+                <MudText Class="nav-section-title mt-2">امور آموزشی و پایش من</MudText>
+                <MudNavLink Icon="@Icons.Material.Filled.Assessment" IconColor="Color.Info" Href="/StudentReports">
+                    کارنامه تحلیلی آزمون‌های من
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.EventNote" IconColor="Color.Success" Href="/StudyPlan">
+                    برنامه مطالعاتی و ثبت ساعت
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Psychology" IconColor="Color.Warning" Href="/Products">
+                    آزمون‌های روانشناسی و استعداد
+                </MudNavLink>
+                <MudNavLink Icon="@Icons.Material.Filled.Quiz" IconColor="Color.Secondary" Href="/TakeExam">
+                    آزمون آنلاین تستی
+                </MudNavLink>
+            }
+
+            @* ۶. تنظیمات و حساب کاربری مشترک *@
+            <MudText Class="nav-section-title mt-2">حساب کاربری</MudText>
+            <MudNavLink Icon="@Icons.Material.Filled.AccountCircle" IconColor="Color.Primary" Href="/Profile">
+                مشخصات پروفایل
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.LockReset" IconColor="Color.Warning" Href="/Frm_Pass">
+                تغییر کلمه عبور
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.ExitToApp" IconColor="Color.Error" Href="/Logout">
+                خروج از سامانه
+            </MudNavLink>
+
+        </MudNavMenu>
+    </MudPaper>
+
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        UserProfileState.OnChange += StateHasChanged;
+
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+    }
+
+    public void Dispose()
+    {
+        UserProfileState.OnChange -= StateHasChanged;
+    }
+}

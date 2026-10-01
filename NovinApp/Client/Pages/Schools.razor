@@ -1,0 +1,270 @@
+@page "/Schools"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Common
+@using NovinApp.Shared.DTOs.Schools
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject IDialogService dialogService
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize(Roles = UserRoles.SystemAdmin)]
+
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="ml-2 align-middle" />
+                مدیریت مدارس
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                تعریف، ویرایش و مدیریت مدارس و واحدهای آموزشی
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.Add"
+                   Class="text-primary font-weight-bold" OnClick="OpenCreateDialog">
+            ثبت مدرسه جدید
+        </MudButton>
+    </div>
+</div>
+
+<MudPaper Elevation="2" Class="pa-4 rounded-lg">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudTextField @bind-Value="searchString" Placeholder="جستجوی نام، کد یا منطقه..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:250px" />
+            <MudSelect T="bool?" @bind-Value="filterActive" Label="وضعیت" Margin="Margin.Dense"
+                       Variant="Variant.Outlined" Style="min-width:130px" Clearable="true">
+                <MudSelectItem Value="@((bool?)true)">فعال</MudSelectItem>
+                <MudSelectItem Value="@((bool?)false)">غیرفعال</MudSelectItem>
+            </MudSelect>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" Size="Size.Small"
+                           Variant="Variant.Outlined" OnClick="RefreshSchools" Title="تازه‌سازی لیست" />
+        </div>
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
+            تعداد کل: @FilteredSchools.Count() مدرسه
+        </MudChip>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center align-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.subtitle2" Class="ms-3">در حال بارگذاری...</MudText>
+        </div>
+    }
+    else if (!FilteredSchools.Any())
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg my-4">
+            هیچ مدرسه‌ای یافت نگردید.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredSchools" Hover="true" Striped="true" Elevation="0" Dense="true" FixedHeader="true">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<SchoolDto, object>(x=>x.Name)">نام مدرسه</MudTableSortLabel></MudTh>
+                <MudTh>کد مدرسه</MudTh>
+                <MudTh>منطقه</MudTh>
+                <MudTh>تلفن</MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<SchoolDto, object>(x=>x.StudentsCount)">دانش‌آموزان</MudTableSortLabel></MudTh>
+                <MudTh>وضعیت</MudTh>
+                <MudTh Class="text-center">عملیات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="نام مدرسه">
+                    <span class="font-weight-bold text-primary">@context.Name</span>
+                </MudTd>
+                <MudTd DataLabel="کد مدرسه">@(context.SchoolCode?.ToString() ?? "---")</MudTd>
+                <MudTd DataLabel="منطقه">@(context.RegionName ?? "---")</MudTd>
+                <MudTd DataLabel="تلفن">@(context.PhoneNumber ?? "---")</MudTd>
+                <MudTd DataLabel="دانش‌آموزان">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                        @context.StudentsCount نفر
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="وضعیت">
+                    @if (context.IsActive)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">فعال</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">غیرفعال</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="عملیات" Class="text-center">
+                    <MudTooltip Text="ویرایش">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="حذف">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteSchool(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[]{10, 25, 50, 100}" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+<MudDialog @bind-Visible="isDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">
+            @(isEditMode ? "ویرایش مدرسه" : "ثبت مدرسه جدید")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@currentModel" OnValidSubmit="SaveSchool">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentModel.Name" Label="نام مدرسه" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => currentModel.Name)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="currentModel.SchoolCode" Label="کد مدرسه" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentModel.RegionName" Label="منطقه آموزشی" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="currentModel.PhoneNumber" Label="تلفن تماس" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="currentModel.Address" Label="آدرس کامل" Variant="Variant.Outlined"
+                                  Lines="2" Margin="Margin.Dense" />
+                </MudItem>
+                @if (isEditMode)
+                {
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Value="isSchoolActive" Label="وضعیت فعالیت مدرسه" Color="Color.Success" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveSchool" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال ذخیره...</span>
+            }
+            else
+            {
+                <span>ذخیره اطلاعات</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .page-banner { background: linear-gradient(135deg, #1565C0 0%, #1976D2 60%, #42A5F5 100%); border-radius: 16px; padding: 20px 24px; }
+</style>
+
+@code {
+    private List<SchoolDto> schools = new();
+    private bool isLoading = true, isSaving = false, isDialogOpen = false, isEditMode = false;
+    private string searchString = "";
+    private int editingId = 0;
+    private bool isSchoolActive = true;
+    private bool? filterActive = null;
+    private CreateSchoolDto currentModel = new();
+    private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+
+    private IEnumerable<SchoolDto> FilteredSchools => schools.Where(s =>
+        (filterActive == null || s.IsActive == filterActive) &&
+        (string.IsNullOrWhiteSpace(searchString) ||
+         s.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         (s.RegionName?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+         (s.SchoolCode?.ToString().Contains(searchString) ?? false)));
+
+    protected override async Task OnInitializedAsync() => await LoadSchools();
+
+    private async Task LoadSchools()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<SchoolDto>>>("api/schools");
+            if (res?.Success == true && res.Data != null) schools = res.Data;
+        }
+        catch (Exception ex) { snackBar.Add($"خطا: {ex.Message}", Severity.Error); }
+        finally { isLoading = false; }
+    }
+
+    private void OpenCreateDialog()
+    {
+        isEditMode = false; editingId = 0; isSchoolActive = true;
+        currentModel = new CreateSchoolDto(); isDialogOpen = true;
+    }
+
+    private void OpenEditDialog(SchoolDto school)
+    {
+        isEditMode = true; editingId = school.Id; isSchoolActive = school.IsActive;
+        currentModel = new CreateSchoolDto { Name = school.Name, SchoolCode = school.SchoolCode, RegionName = school.RegionName, Address = school.Address, PhoneNumber = school.PhoneNumber, ManagerUserId = school.ManagerUserId };
+        isDialogOpen = true;
+    }
+
+    private async Task SaveSchool()
+    {
+        if (string.IsNullOrWhiteSpace(currentModel.Name)) { snackBar.Add("نام مدرسه الزامی است.", Severity.Warning); return; }
+        isSaving = true;
+        try
+        {
+            if (isEditMode)
+            {
+                var updateDto = new UpdateSchoolDto { Id = editingId, Name = currentModel.Name, SchoolCode = currentModel.SchoolCode, RegionName = currentModel.RegionName, Address = currentModel.Address, PhoneNumber = currentModel.PhoneNumber, ManagerUserId = currentModel.ManagerUserId, IsActive = isSchoolActive };
+                var res = await _http.PutAsJsonAsync($"api/schools/{editingId}", updateDto);
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true) { snackBar.Add("مدرسه ویرایش شد.", Severity.Success); isDialogOpen = false; await LoadSchools(); }
+                else snackBar.Add(apiRes?.Message ?? "خطا", Severity.Error);
+            }
+            else
+            {
+                var res = await _http.PostAsJsonAsync("api/schools", currentModel);
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<SchoolDto>>();
+                if (apiRes?.Success == true) { snackBar.Add("مدرسه ثبت شد.", Severity.Success); isDialogOpen = false; await LoadSchools(); }
+                else snackBar.Add(apiRes?.Message ?? "خطا", Severity.Error);
+            }
+        }
+        catch (Exception ex) { snackBar.Add($"خطا: {ex.Message}", Severity.Error); }
+        finally { isSaving = false; }
+    }
+
+    private async Task DeleteSchool(SchoolDto school)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف مدرسه «{school.Name}» اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            try
+            {
+                var res = await _http.DeleteAsync($"api/schools/{school.Id}");
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true) { snackBar.Add("مدرسه حذف شد.", Severity.Success); await LoadSchools(); }
+                else snackBar.Add(apiRes?.Message ?? "خطا", Severity.Error);
+            }
+            catch (Exception ex) { snackBar.Add($"خطا: {ex.Message}", Severity.Error); }
+        }
+    }
+
+    private async Task RefreshSchools()
+    {
+        await LoadSchools();
+        snackBar.Add("لیست مدارس به‌روزرسانی شد.", Severity.Info);
+    }
+}

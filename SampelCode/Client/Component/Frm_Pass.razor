@@ -1,0 +1,163 @@
+@page "/Frm_Pass"
+@inject IJSRuntime JsRuntime
+@inject MudBlazor.ISnackbar snackBar
+@using System.Globalization
+@inject NavigationManager nav
+@using System.Timers
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Component
+@using NovinApp.Shared
+@using NovinApp.Shared.Login
+@inject IDialogService Dialog
+@inject HttpClient _httpClient
+@inject NovinApp.Client.Service.UserProfileStateService UserProfileState
+
+@attribute [Authorize]
+
+<PageHeader Title="تغییر کلمه عبور"
+            Subtitle="جهت حفظ امنیت اطلاعات و حساب کاربری، کلمه عبور خود را دوره‌ای بروزرسانی فرمایید"
+            Icon="@Icons.Material.Filled.LockReset"
+            BannerClass="banner-warning" />
+
+<div class="d-flex justify-center mt-2">
+    <MudCard Elevation="0" Class="modern-card pa-3 pa-sm-5" Style="max-width: 480px; width: 100%;">
+        <EditForm Model="@personel" OnValidSubmit="Save">
+            <MudCardContent Class="pa-2">
+                <MudTextField T="string" @bind-Text="old_pass" InputType="InputType.Password" Variant="Variant.Outlined" Label="کلمه عبور فعلی" Required RequiredError="تکمیل این فیلد ضروری می‌باشد" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Key" Class="mb-4" />
+                <MudTextField T="string" @bind-Text="new_pass" InputType="InputType.Password" Variant="Variant.Outlined" Label="کلمه عبور جدید" Required RequiredError="تکمیل این فیلد ضروری می‌باشد" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock" Class="mb-4" />
+                <MudTextField T="string" @bind-Text="rep_pass" InputType="InputType.Password" Variant="Variant.Outlined" Label="تکرار کلمه عبور جدید" Required RequiredError="تکمیل این فیلد ضروری می‌باشد" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.LockClock" Class="mb-2" />
+            </MudCardContent>
+            <MudCardActions Class="d-flex justify-space-between align-center flex-wrap gap-2 px-2 pt-3">
+                <MudButton Variant="Variant.Filled" ButtonType="ButtonType.Submit" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Size="Size.Large">
+                    بروزرسانی رمز عبور
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Href="/Home" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ArrowBack" Size="Size.Large">
+                    انصراف
+                </MudButton>
+            </MudCardActions>
+        </EditForm>
+    </MudCard>
+</div> 
+
+@code {
+
+    private ISHA1 SHA1 { get; }
+    SHA1 SHA11 = new SHA1();
+
+    User personel = new User();
+
+    string pass="";
+    string old_pass { get; set; }
+    string new_pass{ get; set; }
+    string rep_pass{ get; set; }
+    protected override async Task OnParametersSetAsync()
+    {
+        await Btn_Refresh();
+        await InvokeAsync(() => StateHasChanged());
+    }
+    public async Task<bool> OpenDialog(string txt)
+    {
+
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", txt);
+        var dialog = await Dialog.ShowAsync<Alert_Error>("", parameters);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+
+        }
+    }
+
+    protected async Task Save()
+    {
+        try
+        {
+        if (!string.IsNullOrEmpty(rep_pass) || !string.IsNullOrEmpty(old_pass) || !string.IsNullOrEmpty(new_pass))
+        {
+
+            if (pass != "" || pass != null)
+            {
+                if (new_pass != rep_pass)
+                {
+                    snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                    snackBar.Add("کلمه عبور جدید با تکرار آن یکسان نمی باشد", Severity.Error);
+
+                }
+                else
+                {
+                    personel.mobile =new_pass;
+                    var respon = await _httpClient.PutAsJsonAsync("api/User", personel);
+                    if (respon.IsSuccessStatusCode)
+                    {
+                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                        snackBar.Add("اطلاعات با موفقیت بروز رسانی شد", Severity.Success);
+                        personel = new User();
+                        nav.NavigateTo("/Home");
+                    }
+                    else
+                    {
+
+                        snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+                        snackBar.Add("ویرایش با خطا مواجه شد." + Environment.NewLine + "اطلاعات مورد نظر تغییر داشته مجدد امتحان کنید", Severity.Error);
+                        //  personel = new Personel();
+
+                    }
+                }
+            }
+        }else
+        {
+            snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
+            snackBar.Add("اطلاعات ورودی را کامل کنید", Severity.Warning);
+
+        }
+        }
+        catch
+        {
+
+
+        }
+        
+    }
+    async Task Btn_Refresh()
+    {
+        try
+        {
+            var userId = UserProfileState.CurrentUser?.Id;
+            if (userId == null || userId == 0)
+            {
+                await UserProfileState.LoadUserAsync();
+                userId = UserProfileState.CurrentUser?.Id;
+            }
+
+            if (userId == null || userId == 0)
+            {
+                await OpenDialog("خطا در دریافت اطلاعات کاربری، لطفاً مجدداً وارد سامانه شوید");
+                nav.NavigateTo("/Home");
+                return;
+            }
+
+            personel = await _httpClient.GetFromJsonAsync<User>($"api/User/{userId}");
+            if (personel == null)
+            {
+                await OpenDialog("خطا در دریافت اطلاعات، مجدد امتحان کنید");
+                nav.NavigateTo("/Home");
+            }
+            else
+            {
+                pass = personel.pass ?? personel.mobile;
+            }
+            await InvokeAsync(() => StateHasChanged());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in Frm_Pass: {ex.Message}");
+        }
+    }
+ }

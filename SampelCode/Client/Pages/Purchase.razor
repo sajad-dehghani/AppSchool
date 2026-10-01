@@ -1,0 +1,118 @@
+﻿@page "/purchase"
+@using NovinApp.Shared
+@using NovinApp.Client.Services
+@using MudBlazor
+@inject IPaymentService PaymentService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudCard Class="mt-8">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Align="Align.Center">
+                    خرید پکیج اشتراک
+                </MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudGrid>
+                @foreach (var package in packages)
+                {
+                    <MudItem xs="12">
+                        <MudCard Elevation="2" Class="pa-4">
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">
+                                    @package.Name
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mt-1">
+                                    @package.Description
+                                </MudText>
+                                <MudText Typo="Typo.h5" Align="Align.Center" Class="mt-3">
+                                    @package.Amount.ToString("N0") ریال
+                                </MudText>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Class="mt-3"
+                                           OnClick="() => StartPayment(package)"
+                                           Disabled="@_isLoading">
+                                    @if (_isLoading && _selectedPackageId == package.Id)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                        <MudText Class="ml-2">در حال اتصال...</MudText>
+                                    }
+                                    else
+                                    {
+                                        <span>خرید پکیج</span>
+                                    }
+                                </MudButton>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private List<PackageViewModel> packages = new()
+    {
+        new() { Id = 1, Name = "پکیج پایه", Description = "دسترسی به امکانات پایه به مدت 1 ماه", Amount = 50000 },
+        new() { Id = 2, Name = "پکیج حرفه‌ای", Description = "دسترسی کامل به تمام امکانات به مدت 3 ماه", Amount = 120000 },
+        new() { Id = 3, Name = "پکیج ویژه", Description = "دسترسی کامل + پشتیبانی ویژه به مدت 1 سال", Amount = 350000 }
+    };
+
+    private bool _isLoading = false;
+    private int _selectedPackageId = 0;
+
+    private async Task StartPayment(PackageViewModel package)
+    {
+        _isLoading = true;
+        _selectedPackageId = package.Id;
+        StateHasChanged();
+
+        try
+        {
+            var request = new PaymentRequestDto
+            {
+                PackageId = package.Id,
+                PackageName = package.Name,
+                Amount = package.Amount,
+                Description = $"خرید {package.Name} - {package.Description}"
+            };
+
+            var response = await PaymentService.RequestPayment(request);
+
+            if (response.IsSuccess && !string.IsNullOrEmpty(response.PaymentUrl))
+            {
+                // هدایت به درگاه زرین‌پال
+                Navigation.NavigateTo(response.PaymentUrl, true);
+            }
+            else
+            {
+                Snackbar.Add(response.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            _selectedPackageId = 0;
+            StateHasChanged();
+        }
+    }
+
+    private class PackageViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public long Amount { get; set; }
+    }
+}

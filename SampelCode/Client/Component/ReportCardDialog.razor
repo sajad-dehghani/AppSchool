@@ -1,0 +1,212 @@
+@using NovinApp.Shared.DTOs.Exams
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        @if (ReportCard == null)
+        {
+            <div class="d-flex justify-center my-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <div id="printable-report-card" class="report-card-container pa-4">
+                <!-- سربرگ کارنامه -->
+                <div class="report-header d-flex justify-space-between align-center pb-4 mb-4 border-b-2">
+                    <div class="d-flex align-center gap-3">
+                        <MudAvatar Color="Color.Primary" Size="Size.Large">
+                            <MudIcon Icon="@Icons.Material.Filled.School" Size="Size.Large" />
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.h5" Class="font-weight-bold color-primary">
+                                کارنامه تحلیلی @ReportCard.ExamTitle
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                مرحله: @ReportCard.StageNumber | برگزارکننده: @(ReportCard.Provider ?? "نوین") | تاریخ: @(ReportCard.ExamDate?.ToString("yyyy/MM/dd") ?? "نامشخص")
+                            </MudText>
+                        </div>
+                    </div>
+                    <div class="text-left no-print">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="PrintReport">
+                            چاپ کارنامه (PDF)
+                        </MudButton>
+                    </div>
+                </div>
+
+                <!-- مشخصات دانش‌آموز -->
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 rounded-lg bg-light">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">نام و نام خانوادگی:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@ReportCard.FullName</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">کد ملی:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@ReportCard.NationalCode</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">مدرسه:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@(ReportCard.SchoolName ?? "ثبت نشده")</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">پایه و رشته:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@(ReportCard.GradeLevel ?? "-") / @(ReportCard.Major ?? "-")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <!-- کارت‌های خلاصه نتایج کل -->
+                <MudGrid Spacing="3" Class="mb-4">
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg border-2 border-primary bg-light">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">تراز کل</MudText>
+                            <MudText Typo="Typo.h5" Class="font-weight-bold text-primary">@ReportCard.TotalTaraz.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">بیشترین: @ReportCard.TotalMaxTaraz.ToString("N0")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg border-2 border-info bg-light">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">درصد کل</MudText>
+                            <MudText Typo="Typo.h5" Class="font-weight-bold text-info">@ReportCard.TotalPercent.ToString("F1")%</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">میانگین: @ReportCard.TotalPercentAverage.ToString("F1")%</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg border-2 border-success bg-light">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">رتبه در مدرسه</MudText>
+                            <MudText Typo="Typo.h5" Class="font-weight-bold text-success">
+                                @(ReportCard.RankInSchool > 0 ? ReportCard.RankInSchool.ToString() : "-")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">از @ReportCard.TotalParticipantsSchool نفر</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg border-2 border-warning bg-light">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">رتبه در کل</MudText>
+                            <MudText Typo="Typo.h5" Class="font-weight-bold text-warning">
+                                @(ReportCard.RankInTotal > 0 ? ReportCard.RankInTotal.ToString() : "-")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">از @ReportCard.TotalParticipantsOverall نفر</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <!-- تحلیل نقاط قوت و ضعف -->
+                @if (ReportCard.StrongSubjects.Any() || ReportCard.WeakSubjects.Any())
+                {
+                    <MudGrid Spacing="2" Class="mb-4">
+                        @if (ReportCard.StrongSubjects.Any())
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                                    <strong>دروس نقطه قوت:</strong> @string.Join("، ", ReportCard.StrongSubjects)
+                                </MudAlert>
+                            </MudItem>
+                        }
+                        @if (ReportCard.WeakSubjects.Any())
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                                    <strong>دروس نیازمند تقویت:</strong> @string.Join("، ", ReportCard.WeakSubjects)
+                                </MudAlert>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+
+                <!-- جدول ریز نمرات دروس -->
+                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.ListAlt" Class="ml-1 align-middle" Size="Size.Small" />
+                    ریز نمرات و عملکرد دروس
+                </MudText>
+
+                <MudTable Items="@ReportCard.Subjects" Hover="true" Dense="true" Elevation="0" Outlined="true" Class="mb-4">
+                    <HeaderContent>
+                        <MudTh>نام درس</MudTh>
+                        <MudTh>درصد داوطلب</MudTh>
+                        <MudTh>میانگین کل</MudTh>
+                        <MudTh>تراز درس</MudTh>
+                        <MudTh>رتبه در مدرسه</MudTh>
+                        <MudTh>رتبه در کل</MudTh>
+                        <MudTh>وضعیت کیفی</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Class="font-weight-bold">@context.SubjectName</MudTd>
+                        <MudTd>
+                            <div class="d-flex align-center gap-2">
+                                <span class="font-weight-bold @(context.Percent >= 50 ? "text-success" : (context.Percent >= 25 ? "text-primary" : "text-error"))">
+                                    @context.Percent.ToString("F1")%
+                                </span>
+                                <MudProgressLinear Color="@(context.Percent >= 50 ? Color.Success : (context.Percent >= 25 ? Color.Primary : Color.Error))"
+                                                   Value="@Math.Max(5, Math.Min(100, (double)context.Percent))" Class="rounded" Style="width: 70px;" />
+                            </div>
+                        </MudTd>
+                        <MudTd>@context.PercentAverage.ToString("F1")%</MudTd>
+                        <MudTd><span class="font-weight-bold text-primary">@context.Taraz.ToString("N0")</span></MudTd>
+                        <MudTd>@(context.RankInSchool > 0 ? context.RankInSchool.ToString() : "-")</MudTd>
+                        <MudTd>@(context.RankInTotal > 0 ? context.RankInTotal.ToString() : "-")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@GetSubjectStatusColor(context.StatusTitle)" Variant="Variant.Filled">
+                                @(context.StatusTitle ?? "خوب")
+                            </MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <!-- تاریخچه آزمون‌ها -->
+                @if (ReportCard.ExamHistory.Count > 1)
+                {
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="ml-1 align-middle" Size="Size.Small" />
+                        روند پیشرفت در آزمون‌های پیشین
+                    </MudText>
+                    <MudTable Items="@ReportCard.ExamHistory" Hover="true" Dense="true" Elevation="0" Outlined="true">
+                        <HeaderContent>
+                            <MudTh>نام آزمون</MudTh>
+                            <MudTh>مرحله</MudTh>
+                            <MudTh>درصد کل</MudTh>
+                            <MudTh>تراز کل</MudTh>
+                            <MudTh>رتبه در مدرسه</MudTh>
+                            <MudTh>رتبه در کل</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ExamTitle</MudTd>
+                            <MudTd>مرحله @context.StageNumber</MudTd>
+                            <MudTd class="font-weight-bold">@context.TotalPercent.ToString("F1")%</MudTd>
+                            <MudTd class="font-weight-bold text-primary">@context.TotalTaraz.ToString("N0")</MudTd>
+                            <MudTd>@(context.RankInSchool > 0 ? context.RankInSchool.ToString() : "-")</MudTd>
+                            <MudTd>@(context.RankInTotal > 0 ? context.RankInTotal.ToString() : "-")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="Close">بستن</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public ReportCardDto? ReportCard { get; set; }
+
+    private void Close() => MudDialog.Close();
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private Color GetSubjectStatusColor(string? status) => status switch
+    {
+        "عالی" => Color.Success,
+        "خوب" => Color.Info,
+        "متوسط" => Color.Warning,
+        _ => Color.Error
+    };
+}

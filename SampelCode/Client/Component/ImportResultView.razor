@@ -1,0 +1,97 @@
+@using NovinApp.Shared.DTOs.Import
+@using NovinApp.Shared.Enums
+
+<MudPaper Elevation="0" Class="mt-4 pa-4 rounded-lg" Style="border: 1px solid var(--mud-palette-lines-default);">
+    <div class="d-flex align-center gap-3 mb-3">
+        <MudIcon Icon="@StatusIcon" Color="@StatusColor" Size="Size.Large" />
+        <div>
+            <MudText Typo="Typo.h6" Class="font-weight-bold">نتیجه ایمپورت فایل «@Result.FileName»</MudText>
+            <MudText Typo="Typo.body2" Color="@StatusColor">@Result.SummaryMessage</MudText>
+        </div>
+    </div>
+
+    <MudGrid Spacing="2" Class="mb-3">
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg" Style="background: var(--mud-palette-background-grey);">
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@Result.TotalRows</MudText>
+                <MudText Typo="Typo.caption">کل ردیف‌ها</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg" Style="background: rgba(76,175,80,0.1);">
+                <MudText Typo="Typo.h5" Class="font-weight-bold text-success">@Result.SuccessfulRows</MudText>
+                <MudText Typo="Typo.caption">موفق</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg" Style="background: rgba(244,67,54,0.1);">
+                <MudText Typo="Typo.h5" Class="font-weight-bold text-error">@Result.FailedRows</MudText>
+                <MudText Typo="Typo.caption">خطا</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg" Style="background: rgba(255,152,0,0.1);">
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Style="color: var(--mud-palette-warning);">@Result.WarningRows</MudText>
+                <MudText Typo="Typo.caption">هشدار</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (Result.Errors.Any())
+    {
+        <MudExpansionPanels Elevation="0" Class="mt-2">
+            <MudExpansionPanel Text="@($"مشاهده جزئیات خطاها ({Result.Errors.Count} مورد)")" IsInitiallyExpanded="false">
+                <MudTable Items="@Result.Errors" Hover="true" Dense="true" Elevation="0" Striped="true">
+                    <HeaderContent>
+                        <MudTh>ردیف</MudTh>
+                        <MudTh>ستون</MudTh>
+                        <MudTh>مقدار</MudTh>
+                        <MudTh>نوع خطا</MudTh>
+                        <MudTh>توضیحات</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.RowNumber</MudTd>
+                        <MudTd>@(context.ColumnName ?? "---")</MudTd>
+                        <MudTd>@(context.RawValue ?? "---")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@GetErrorTypeColor(context.ErrorType)" Variant="Variant.Outlined">
+                                @context.ErrorType
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>@context.ErrorMessage</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public ImportResultDto Result { get; set; } = new();
+
+    private string StatusIcon => Result.Status switch
+    {
+        ImportStatus.Completed => Icons.Material.Filled.CheckCircle,
+        ImportStatus.PartialFailure => Icons.Material.Filled.Warning,
+        ImportStatus.Failed => Icons.Material.Filled.Error,
+        _ => Icons.Material.Filled.Info
+    };
+
+    private Color StatusColor => Result.Status switch
+    {
+        ImportStatus.Completed => Color.Success,
+        ImportStatus.PartialFailure => Color.Warning,
+        ImportStatus.Failed => Color.Error,
+        _ => Color.Info
+    };
+
+    private Color GetErrorTypeColor(string errorType) => errorType switch
+    {
+        "Duplicate" => Color.Warning,
+        "DuplicateError" => Color.Error,
+        "EmptyRequired" or "EmptyField" => Color.Error,
+        "InvalidFormat" => Color.Warning,
+        "StudentNotFound" => Color.Info,
+        _ => Color.Default
+    };
+}

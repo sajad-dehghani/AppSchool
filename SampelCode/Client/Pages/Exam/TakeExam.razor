@@ -1,0 +1,224 @@
+﻿@page "/TakeExam"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared
+@inject IJSRuntime JsRuntime
+@inject MudBlazor.ISnackbar snackBar
+@inject NavigationManager nav
+@inject IDialogService Dialog
+@inject HttpClient _httpClient
+@implements IDisposable
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+
+<MudItem Class="pa-4" md="12" xs="12">
+    <MudGrid>
+
+        <MudItem md="6" xs="12">
+            <MudText Class="mt-2" Typo="Typo.h4">سوال جدید</MudText>
+        </MudItem>
+    </MudGrid>
+</MudItem>
+<MudDivider DividerType="DividerType.Inset" />
+
+<MudPaper Elevation="5" Class="pa-2 mt-3">
+
+    <MudItem md="12" xs="12">
+        <MudPaper Class="mud-theme-dark mt-3 pb-1" Width="170px" Height="35px" Elevation="5">
+            <MudText Align=Align.Right Class="pa-2" Typo="Typo.body2">@($"سوال "+(id_q-177)+" از 80")</MudText>
+        </MudPaper>
+        <MudPaper Class="mud-theme-dark" Width="100%" Square="false" Height="2px">
+        </MudPaper>
+    </MudItem>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="tag-container">
+        <MudText Align="Align.Right" Class="mt-2" Typo="Typo.body1">@((MarkupString)q.QuestionText)</MudText>
+    </MudStack>
+    <MudRadioGroup T="string" @bind-SelectedValue="selectedOptionId" ValueChanged="@OnRadioChanged" Class="mt-4">
+        @if (q.NumberOfOptions >= 1)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string"  Value="@(q.Option1Text+"|"+q.Option1Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option1Text)
+                        </MudText>
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+        @if (q.NumberOfOptions >= 2)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string" Value="@(q.Option2Text + "|" + q.Option2Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option2Text)
+                        </MudText>
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+        @if (q.NumberOfOptions >= 3)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string" Value="@(q.Option3Text + "|" + q.Option3Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option3Text)
+                        </MudText>
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+        @if (q.NumberOfOptions >= 4)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string" Value="@(q.Option4Text + "|" + q.Option4Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option4Text)
+                        </MudText>
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+        @if (q.NumberOfOptions >= 5)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string" Value="@(q.Option5Text + "|" + q.Option5Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option5Text)
+                        </MudText>
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+        @if (q.NumberOfOptions >= 6)
+        {
+            <MudItem xs="12" md="12">
+                <MudPaper Elevation="10" Class="pa-2 ma-1 ">
+                    <MudRadio Size="Size.Medium" Color="Color.Primary" T="string" Value="@(q.Option6Text + "|" + q.Option6Score)">
+                        <MudText Align=Align.Right Typo="Typo.body2">
+                            @((MarkupString)q.Option6Text)
+                        </MudText>
+
+                    </MudRadio>
+                </MudPaper>
+            </MudItem>
+        }
+
+
+    </MudRadioGroup>
+    <MudItem md="12" xs="12">
+        <MudCardActions Class="d-flex justify-end">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Class="ml-2"
+                       ButtonType="ButtonType.Submit"
+                       OnClick="@btnbackq"
+                       Size="Size.Small">
+                سوال قبلی
+            </MudButton>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Close"
+                       Size="Size.Small">
+                پایان آزمون
+            </MudButton>
+        </MudCardActions>
+    </MudItem>
+</MudPaper>
+
+
+@code {
+    Question q = new Question();
+
+    private List<Question>? questions;
+    private int currentIndex = 0;
+    private int totalScore = 0;
+    private string? selectedOptionId;
+    private System.Timers.Timer? timerObj;
+    private int timer = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        if (questions != null && questions.Any())
+        {
+            StartTimerForCurrent();
+        }
+        q = await _httpClient.GetFromJsonAsync<Question>($"api/Question/{id_q}");
+    }
+    int id_q = 178;
+    private async Task OnRadioChanged()
+    {
+        //update
+        id_q += 1;
+        q = await _httpClient.GetFromJsonAsync<Question>($"api/Question/{id_q}");
+        selectedOptionId = "";
+        
+    }
+    private async Task btnbackq()
+    {
+        //update
+        id_q -= 1;
+        q = await _httpClient.GetFromJsonAsync<Question>($"api/Question/{id_q}");
+        selectedOptionId = "";
+
+    }
+    
+    private void StartTimerForCurrent()
+    {
+        timer = 20000;
+        timerObj?.Stop();
+        timerObj = new System.Timers.Timer(1000);
+        timerObj.Elapsed += (s, e) =>
+        {
+            timer--;
+            if (timer <= 0)
+            {
+                timerObj.Stop();
+                SubmitAnswer();
+            }
+            InvokeAsync(StateHasChanged);
+        };
+        timerObj.Start();
+    }
+
+    private void SubmitAnswer()
+    {
+        timerObj?.Stop();
+        var q = questions![currentIndex];
+        decimal selectedScore = 0;
+        switch (selectedOptionId)
+        {
+            case "opt1": selectedScore = q.Option1Score; break;
+            case "opt2": selectedScore = q.Option2Score; break;
+            case "opt3": selectedScore = q.Option3Score; break;
+            case "opt4": selectedScore = q.Option4Score; break;
+        }
+        totalScore += (int)selectedScore;
+
+        currentIndex++;
+        selectedOptionId = null;
+        if (currentIndex < questions.Count)
+            StartTimerForCurrent();
+        StateHasChanged();
+    }
+    private CancellationTokenSource? _cts;
+    public void Dispose()
+    {
+        // ۱. لغو تمام عملیات Async در حال اجرا
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        Cls_global.IsEdit = false;
+        Cls_global.select_row_id = -1;
+
+    }
+}

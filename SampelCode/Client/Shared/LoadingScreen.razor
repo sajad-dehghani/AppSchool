@@ -1,0 +1,28 @@
+﻿@if (contentLoaded)
+{
+    @ChildContent
+}
+else
+{
+    <div style="position:absolute;top:35vh; left:0.5vh; width:95%; text-align:center">
+        <MudImage Src="img/dash-circle-preloader-1.svg" Width="390" Height="390" />
+       
+    </div>
+    
+}
+
+
+
+@code {
+
+    bool contentLoaded;
+
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(1000);
+        contentLoaded = true;
+    }
+}

@@ -16,77 +16,399 @@
 <MudThemeProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
-<MudRTLProvider RightToLeft="true">
-    <div class="login-page">
-        <MudItem xs="11" sm="7" md="4" lg="3" Class="pa-2">
-            <EditForm Model="@loginModel" OnValidSubmit="SubmitHandlerAsync">
-                <DataAnnotationsValidator />
-                <MudPaper Class="pa-6" Style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);">
-                    <MudText Align="Align.Center" Class="mb-4">
-                        <MudChip T="string" Size="Size.Large" Icon="@Icons.Material.Filled.School" Color="Color.Primary">
-                            ورود به سامانه نوین
-                        </MudChip>
-                    </MudText>
 
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="loginModel.Username" Label="نام کاربری (کد ملی)" T="string" Variant="Variant.Outlined"
-                                          Adornment="Adornment.End" AdornmentColor="Color.Primary" AdornmentIcon="@Icons.Material.Filled.AccountCircle"
-                                          For="@(() => loginModel.Username)" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="loginModel.Password" Label="کلمه عبور" Variant="Variant.Outlined" InputType="@PasswordInput"
-                                          AdornmentColor="Color.Primary" Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon" OnAdornmentClick="ButtonTestclick"
-                                          AdornmentAriaLabel="نمایش کلمه عبور" For="@(() => loginModel.Password)" />
-                        </MudItem>
-                        <MudItem xs="12" Class="d-flex justify-center mt-2">
+<MudRTLProvider RightToLeft="true">
+    <div class="login-viewport">
+        <!-- بوم پس‌زمینه پویا و انیمیشنی -->
+        <canvas id="bg-network-canvas" class="bg-canvas"></canvas>
+      
+        <div class="login-layout-container">
+            <!-- کارت دو ستونه شیشه‌ای مدرن -->
+            <div class="login-card-glass">
+                
+                <!-- ستون اول: برندینگ و ویژگی‌های سامانه (سمت راست در RTL) -->
+                <div class="brand-side">
+                    <div>
+                        <div class="brand-badge">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoStories" Size="Size.Small" Class="ml-1" />
+                            <span>مسیر رتبه برتر شدن</span>
+                        </div>
+
+                        <h1 class="brand-title">سامانه هوشمند <br /><span class="brand-highlight">مشاور نوین</span></h1>
+                        <p class="brand-subtitle">
+                            همراه تخصصی برنامه‌ریزی کنکور، آزمون‌های شخصیت‌شناسی و پایش عملکرد تحصیلی
+                        </p>
+
+                        <!-- ویژگی‌های کلیدی -->
+                        <div class="feature-list">
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+                                </div>
+                                <span>تحلیل هوشمند تراز و عملکرد آزمون‌ها</span>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                                </div>
+                                <span>آزمون‌های روانشناسی و هدایت تحصیلی نوین</span>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.WorkspacePremium" Size="Size.Small" />
+                                </div>
+                                <span>برنامه‌ریزی گام‌به‌گام تا موفقیت در کنکور</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="brand-footer">
+                        <span>نسخه ۲.۴ • همراه نوین شما</span>
+                    </div>
+                </div>
+
+                <!-- ستون دوم: فرم ورود به سیستم -->
+                <div class="form-side">
+                    <div class="form-header">
+                        <div class="logo-box">
+                            <MudIcon Icon="@Icons.Material.Filled.School" Size="Size.Large" Color="Color.Primary" />
+                        </div>
+                        <h2 class="form-title">ورود به سامانه</h2>
+                        <p class="form-description">کد ملی و کلمه عبور خود را وارد نمایید</p>
+                    </div>
+
+                    <EditForm Model="@loginModel" OnValidSubmit="SubmitHandlerAsync">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-field-group">
+                            <label class="field-label">کد ملی (نام کاربری)</label>
+                            <MudTextField @bind-Value="loginModel.Username"
+                                          Placeholder="کد ملی خود را وارد کنید"
+                                          T="string"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Outlined.Person"
+                                          For="@(() => loginModel.Username)"
+                                          Class="custom-mud-input" />
+                        </div>
+
+                        <div class="form-field-group mt-3">
+                            <label class="field-label">کلمه عبور</label>
+                            <MudTextField @bind-Value="loginModel.Password"
+                                          Placeholder="کلمه عبور حساب کاربری"
+                                          Variant="Variant.Outlined"
+                                          InputType="@PasswordInput"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@PasswordInputIcon"
+                                          OnAdornmentClick="ButtonTestclick"
+                                          AdornmentAriaLabel="نمایش کلمه عبور"
+                                          For="@(() => loginModel.Password)"
+                                          Class="custom-mud-input" />
+                        </div>
+
+                        <div class="form-actions mt-5">
                             @if (!loading)
                             {
-                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true">
-                                    ورود به سامانه
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Class="submit-btn">
+                                    ورود به حساب کاربری
                                 </MudButton>
                             }
                             else
                             {
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" Disabled="true">
-                                    <span>در حال بررسی اطلاعات...</span>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Disabled="true"
+                                           Class="submit-btn btn-loading">
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-2" />
+                                    <span>در حال احراز هویت...</span>
                                 </MudButton>
                             }
-                        </MudItem>
-                    </MudGrid>
+                        </div>
+                    </EditForm>
 
-                    @if (loading)
-                    {
-                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
-                    }
-
-                    <div class="mt-6 text-center">
-                        <MudText Typo="Typo.caption" Color="Color.Dark" Style="display: block;">
-                            سامانه هدایت تحصیلی و آزمون‌های روانشناسی
-                        </MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="display: block;">
-                            نسخه ۲.۰
-                        </MudText>
+                    <div class="card-footer-section">
+                        <div class="system-security-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" />
+                            <span>ارتباط رمزنگاری‌شده و امن</span>
+                        </div>
+                        <span class="version-label">شرکت آرسام داده پرداز پارس</span>
                     </div>
-                </MudPaper>
-            </EditForm>
-        </MudItem>
+                </div>
+
+            </div>
+        </div>
     </div>
 </MudRTLProvider>
 
 <style>
-    .login-page {
-        background-image: url('img/login.jpg');
-        background-repeat: no-repeat;
-        background-size: cover;
-        background-position: center;
-        min-height: 100vh;
+    /* محیط کلی صفحه */
+    .login-viewport {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: radial-gradient(circle at 50% 30%, #f4f8ff 0%, #e5efff 50%, #dbe9fc 100%);
+        font-family: inherit;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* بوم انیمیشن پس‌زمینه */
+    .bg-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* ساختار چیدمان جهت قرارگیری فرم در مرکز */
+    .login-layout-container {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        max-width: 1020px;
+        margin: 0 auto;
+        padding: 1.5rem;
         display: flex;
         justify-content: center;
         align-items: center;
+    }
+
+    /* کارت دو ستونه با افکت گلس‌مورفیسم مدرن */
+    .login-card-glass {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        border-radius: 26px;
+        box-shadow: 0 24px 60px rgba(37, 99, 235, 0.16), 0 4px 20px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    /* ستون معرفی خدمات و برندینگ (سمت راست) */
+    .brand-side {
+        flex: 1.1;
+        background: linear-gradient(145deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+        color: #ffffff;
+        padding: 3.2rem 2.8rem;
+        display: flex;
         flex-direction: column;
-        margin: 0;
-        padding: 0;
+        justify-content: space-between;
+        position: relative;
+    }
+
+    .brand-badge {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        width: fit-content;
+        color: #dbeafe;
+        margin-bottom: 1.6rem;
+    }
+
+    .brand-title {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.4;
+        margin-bottom: 0.8rem;
+        color: #ffffff;
+    }
+
+    .brand-highlight {
+        background: linear-gradient(90deg, #93c5fd, #67e8f9);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+        color: #e0e7ff;
+        font-size: 0.9rem;
+        line-height: 1.7;
+        margin-bottom: 2rem;
+    }
+
+    .feature-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.1rem;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        font-size: 0.88rem;
+        color: #f1f5f9;
+    }
+
+    .feature-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        flex-shrink: 0;
+    }
+
+    .brand-footer {
+        color: #bfdbfe;
+        font-size: 0.78rem;
+        margin-top: 2rem;
+        opacity: 0.85;
+    }
+
+    /* ستون فرم ورود (سمت چپ) */
+    .form-side {
+        flex: 1;
+        padding: 3.2rem 2.8rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.95);
+    }
+
+    .form-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .logo-box {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+
+    .form-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-description {
+        font-size: 0.88rem;
+        color: #64748b;
+        margin-bottom: 0;
+    }
+
+    .field-label {
+        display: block;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 0.45rem;
+    }
+
+    /* استایل سازگار فیلدهای MudBlazor با زمینه روشن */
+    .custom-mud-input {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+    }
+
+    .custom-mud-input .mud-input-outlined-border {
+        border-color: rgba(15, 23, 42, 0.16) !important;
+        border-radius: 12px !important;
+    }
+
+    .custom-mud-input:hover .mud-input-outlined-border {
+        border-color: #3b82f6 !important;
+    }
+
+    .custom-mud-input.mud-input-control:focus-within .mud-input-outlined-border {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+    }
+
+    .custom-mud-input input {
+        color: #0f172a !important;
+        font-size: 0.92rem !important;
+    }
+
+    .custom-mud-input .mud-icon-root {
+        color: #64748b !important;
+    }
+
+    /* دکمه ورود */
+    .submit-btn {
+        height: 48px !important;
+        border-radius: 12px !important;
+        background-color: #2563eb !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        letter-spacing: normal !important;
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35) !important;
+        transition: all 0.25s ease !important;
+    }
+
+    .submit-btn:hover {
+        background-color: #1d4ed8 !important;
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45) !important;
+        transform: translateY(-1px);
+    }
+
+    .card-footer-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.8rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        font-size: 0.78rem;
+        color: #64748b;
+    }
+
+    .system-security-note {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #475569;
+    }
+
+    /* واکنش‌گرایی در نمایشگرهای موبایل و تبلت */
+    @@media (max-width: 860px) {
+        .login-card-glass {
+            flex-direction: column;
+            border-radius: 20px;
+        }
+
+        .brand-side {
+            padding: 2.2rem 1.8rem;
+        }
+
+        .form-side {
+            padding: 2.2rem 1.8rem;
+        }
+
+        .brand-title {
+            font-size: 1.6rem;
+        }
     }
 </style>
 
@@ -117,6 +439,15 @@
             {
                 navigation.NavigateTo("/Home");
             }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // راه‌اندازی انیمیشن بوم پس‌زمینه
+            await js.InvokeVoidAsync("initBackgroundCanvas");
         }
     }
 

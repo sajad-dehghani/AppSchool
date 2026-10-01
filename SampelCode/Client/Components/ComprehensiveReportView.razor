@@ -1,0 +1,1236 @@
+@using NovinApp.Shared
+@inject IJSRuntime JS
+
+<div class="comprehensive-report-container" id="printableComprehensiveReport">
+    @* نوار ابزار بالا (فقط در نمایش وب، پنهان در پرینت) *@
+    <div class="report-toolbar no-print">
+        <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+            <div class="d-flex align-center gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" Size="Size.Large" OnClick="PrintReport" Class="px-6 py-2 rounded-lg font-weight-bold">
+                    چاپ و دریافت کارنامه رسمی (PDF)
+                </MudButton>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Verified">
+                    نسخه رسمی استاندارد هدایت تحصیلی
+                </MudChip>
+            </div>
+            @if (OnBack.HasDelegate)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ArrowForward" OnClick="OnBack" Class="rounded-lg">
+                    بازگشت
+                </MudButton>
+            }
+        </div>
+    </div>
+
+    @* ==========================================
+       صفحه ۱: جلد رسمی کارنامه (Cover Page)
+       ========================================== *@
+    <div class="report-page page-cover">
+        <div class="cover-art-container">
+            <div class="cover-art-shape shape-blue"></div>
+            <div class="cover-art-shape shape-yellow"></div>
+            <div class="cover-art-shape shape-green"></div>
+            <div class="cover-art-shape shape-cyan"></div>
+        </div>
+
+        <div class="cover-content">
+            <div class="cover-badge">سامانه هوشمند هدایت تحصیلی و شغلی</div>
+            <h1 class="cover-title">کارنامه جامع هدایت تحصیلی و شغلی</h1>
+            <p class="cover-subtitle">سنجش رغبت، توانمندی‌های ذهنی و انطباق با ۱۸ حوزه کاری و ۷ شاخه تحصیلی</p>
+
+            <div class="cover-info-card">
+                <div class="info-row">
+                    <span class="info-label">نام و نام خانوادگی:</span>
+                    <span class="info-val">@Report.StudentName</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">کد ملی دانش‌آموز:</span>
+                    <span class="info-val">@Report.StudentNationalCode</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">مشاور هدایت تحصیلی:</span>
+                    <span class="info-val">@Report.CounselorName</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">مرکز آموزشی / موسسه:</span>
+                    <span class="info-val">@Report.InstitutionName</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">تاریخ صدور کارنامه:</span>
+                    <span class="info-val">@Report.TestDatePersian</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-footer-single">
+            <span>سامانه هدایت تحصیلی نوین</span>
+            <span>صفحه ۱</span>
+        </div>
+    </div>
+
+    @* ==========================================
+       صفحه ۲: مقدمه و فهرست کارنامه
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(2)
+
+        <div class="page-body">
+            <div class="page-two-cols">
+                @* ستون راست: متن مقدمه علمی *@
+                <div class="intro-column">
+                    <div class="section-badge-header">
+                        <span class="badge-icon">📖</span>
+                        <h2>مقدمه</h2>
+                    </div>
+                    <div class="intro-text-box">
+                        <p>
+                            کارنامه پیش رو که با هدف هدایت تحصیلی و شغلی در اختیار شما قرار گرفته است، حاصل بررسی دقیق و تخصصی مقیاس‌های استاندارد روانشناختی، رغبت‌سنجی و استعدادهای چندگانه می‌باشد.
+                        </p>
+                        <p>
+                            با عنایت به توضیحات فوق، نتایج گزارش‌شده در این کارنامه با توجه به ویژگی‌های شخصیتی، توانمندی‌ها و انتظارات شما از رشته تحصیلی ارائه شده است. علایق فردی معمولاً متأثر از ساختار روانشناختی و توانمندی‌های فردی هستند؛ بنابراین با تقریب بالایی این دو در یک راستا عمل می‌کنند.
+                        </p>
+                        <p>
+                            باید در نظر داشت که این کارنامه نقش <strong>هدایت‌کننده، افق‌گشا و پیشنهاددهنده</strong> را دارد و بخشی از موفقیت تحصیلی و شغلی را با تحلیل علمی پیش‌بینی می‌کند؛ لذا شایسته است تصمیم‌گیری نهایی با همراهی و مشورت خانواده و مشاور تحصیلی شما انجام گیرد تا بهترین نتیجه حاصل شود.
+                        </p>
+                    </div>
+                </div>
+
+                @* ستون چپ: فهرست مطالب کارنامه *@
+                <div class="toc-column">
+                    <div class="toc-box">
+                        <div class="toc-title">آنچه در این کارنامه مشاهده می‌کنیم:</div>
+                        <ul class="toc-list">
+                            <li><span class="check-icon">✓</span> مقدمه و چارچوب علمی آزمون</li>
+                            <li><span class="check-icon">✓</span> کارنامه ارزیابی شخصیت و سبک تفکر</li>
+                            <li><span class="check-icon">✓</span> وضعیت شما در یک نگاه (۷ شاخه تحصیلی)</li>
+                            <li>
+                                <span class="check-icon">✓</span> انطباق با ۱۸ حوزه کاری و شغلی:
+                                <ul class="toc-sublist">
+                                    @foreach (var domain in Report.Domains.Take(9))
+                                    {
+                                        <li>• @domain.Name</li>
+                                    }
+                                </ul>
+                            </li>
+                            <li><span class="check-icon">✓</span> رشته‌های دارای بالاترین اولویت در شاخه‌ها (امتیاز ستاره‌ای)</li>
+                            <li><span class="check-icon">✓</span> وضعیت رشته‌های دارای فاصله با روحیات شما</li>
+                            <li><span class="check-icon">✓</span> نظریه نهایی و تحلیل هوش مصنوعی اختصاصی</li>
+                            <li><span class="check-icon">✓</span> پیوست معرفی دسته‌بندی‌های تحصیلی</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @RenderPageFooter(2)
+    </div>
+
+    @* ==========================================
+       صفحه ۳: کارنامه ارزیابی شخصیت
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(3)
+
+        <div class="page-body">
+            <div class="section-title-banner">
+                <span class="banner-icon">👤</span>
+                <h2>کارنامه ارزیابی شخصیت و سبک یادگیری</h2>
+            </div>
+
+            <div class="personality-narrative-card">
+                <p>@Report.PersonalitySummary</p>
+            </div>
+
+            @* چکیده ویژگی‌های شاخص *@
+            <div class="traits-highlights-grid mt-4">
+                <div class="trait-highlight-box">
+                    <div class="trait-icon">🎯</div>
+                    <div class="trait-title">رویکرد هدف‌گذاری</div>
+                    <div class="trait-desc">پیشبرد برنامه‌ریزی تحصیلی بر مبنای آرامش، تمرکز پایدار و پرهیز از شتاب‌زدگی فرساینده.</div>
+                </div>
+                <div class="trait-highlight-box">
+                    <div class="trait-icon">🤝</div>
+                    <div class="trait-title">سبک تعاملی</div>
+                    <div class="trait-desc">سازگاری با کار تیمی همراه با حفظ استقلال فکری در تحلیل مفاهیم و حل مسئله.</div>
+                </div>
+                <div class="trait-highlight-box">
+                    <div class="trait-icon">💡</div>
+                    <div class="trait-title">مهارت یادگیری</div>
+                    <div class="trait-desc">درک مفهومی الگوها و علاقه به کاربردی‌سازی آموخته‌ها در دنیای واقعی.</div>
+                </div>
+            </div>
+        </div>
+
+        @RenderPageFooter(3)
+    </div>
+
+    @* ==========================================
+       صفحه ۴: وضعیت شما در یک نگاه (۷ شاخه تحصیلی)
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(4)
+
+        <div class="page-body">
+            <div class="section-title-banner">
+                <span class="banner-icon">👁️</span>
+                <h2>وضعیت شما در یک نگاه (شاخه های تحصیلی دوره دوم متوسطه)</h2>
+            </div>
+            <p class="section-guide-text">
+                در این جداول، با توجه به استعدادها و رغبت‌های شما در هر شاخه تحصیلی و میزان انطباق آن با جامعه تحصیلی، وضعیت شما به تفکیک رشته‌های سازگار و غیرسازگار گزارش شده است:
+            </p>
+
+            <div class="branch-summary-tables">
+                @foreach (var branch in Report.BranchStatuses)
+                {
+                    <div class="branch-status-row">
+                        <div class="branch-header-col" style="background-color: @branch.HeaderColor;">
+                            <span class="branch-name">@branch.BranchName</span>
+                        </div>
+                        <div class="branch-suitability-col" style="background-color: @branch.SuitabilityColor;">
+                            <span class="suitability-label">میزان تناسب</span>
+                            <span class="suitability-val">@branch.Suitability</span>
+                        </div>
+                        <div class="branch-content-col good-majors">
+                            <span class="col-title">رشته‌های دارای اولویت و مناسب:</span>
+                            <span class="majors-text">@(string.Join(" • ", branch.SuitableMajors))</span>
+                        </div>
+                        <div class="branch-content-col bad-majors">
+                            <span class="col-title">رشته‌های دارای عدم انطباق:</span>
+                            <span class="majors-text">@(string.Join(" • ", branch.UnsuitableMajors))</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @RenderPageFooter(4)
+    </div>
+
+    @* ==========================================
+       صفحه ۵: نمودار مقایسه‌ای ۱۸ حوزه کاری
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(5)
+
+        <div class="page-body">
+            <div class="section-title-banner">
+                <span class="banner-icon">📊</span>
+                <h2>بررسی تطابق تحصیلی و شغلی (نمودار ۱۸ حوزه کاری)</h2>
+            </div>
+            <p class="section-guide-text">
+                در این بخش با بررسی رشته-شغل‌ها در ۱۸ حوزه کاری، میزان تطابق شخصیت، توانمندی و رغبت‌های شما گزارش شده است. هر چه درصد این انطباق بیشتر باشد، احتمال رضایت‌مندی و موفقیت شغلی شما در آینده بالاتر خواهد بود:
+            </p>
+
+            <div class="domains-barchart-container">
+                @foreach (var domain in Report.Domains)
+                {
+                    <div class="barchart-item">
+                        <div class="barchart-meta">
+                            <span class="domain-id">@domain.Id</span>
+                            <span class="domain-title">@domain.Name</span>
+                        </div>
+                        <div class="barchart-bar-track">
+                            <div class="barchart-bar-fill" style="width: @domain.MatchPercentage%; background-color: @domain.ColorHex;"></div>
+                        </div>
+                        <span class="barchart-percent" style="color: @domain.ColorHex;">@domain.MatchPercentage%</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @RenderPageFooter(5)
+    </div>
+
+    @* ==========================================
+       صفحات ۶ تا ۱۰: ارزیابی تفکیکی ۱۸ حوزه کاری با گیج عقربه‌ای
+       ========================================== *@
+    @for (int chunkIndex = 0; chunkIndex < 5; chunkIndex++)
+    {
+        var domainChunk = Report.Domains.Skip(chunkIndex * 4).Take(4).ToList();
+        if (domainChunk.Any())
+        {
+            int pageNum = 6 + chunkIndex;
+            <div class="report-page">
+                @RenderPageHeader(pageNum)
+
+                <div class="page-body">
+                    <div class="section-title-banner compact">
+                        <span class="banner-icon">🧭</span>
+                        <h2>ارزیابی تخصصی حوزه‌های شغلی و تحصیلی (صفحه @(chunkIndex + 1) از ۵)</h2>
+                    </div>
+
+                    <div class="domain-cards-grid">
+                        @foreach (var d in domainChunk)
+                        {
+                            <div class="domain-card">
+                                <div class="domain-card-header">
+                                    <span class="domain-badge-number">#@d.Id</span>
+                                    <h3 class="domain-name">@d.Name</h3>
+                                </div>
+
+                                <div class="domain-card-body">
+                                    <div class="domain-gauge-side">
+                                        @RenderSpeedometerGauge(d.MatchPercentage)
+                                    </div>
+                                    <div class="domain-info-side">
+                                        <p class="domain-description">@d.Description</p>
+                                        <div class="domain-jobs-box">
+                                            <strong>مشاغل و حرفه‌های پیشنهادی:</strong>
+                                            <p class="jobs-list">@(string.Join(" ، ", d.SuggestedJobs))</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @RenderPageFooter(pageNum)
+            </div>
+        }
+    }
+
+    @* ==========================================
+       صفحه ۱۱: جدول رشته‌های پیشنهادی برتر (ستاره‌دار ★)
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(11)
+
+        <div class="page-body">
+            <div class="section-title-banner">
+                <span class="banner-icon">⭐</span>
+                <h2>رشته‌های پیشنهادی دارای بالاترین تناسب با شخصیت و استعداد شما</h2>
+            </div>
+            <p class="section-guide-text">
+                رشته‌های زیر بر مبنای بالاترین ضریب همبستگی با استعدادها و تیپ روانشناختی شما اولویت‌بندی شده‌اند:
+            </p>
+
+            <div class="stars-table-container">
+                <table class="custom-report-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">ردیف</th>
+                            <th style="width: 42%;">نام رشته تحصیلی / دانشگاهی</th>
+                            <th style="width: 25%;">شاخه مربوطه</th>
+                            <th style="width: 25%;">میزان تناسب با شخصیت</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Report.RecommendedMajors.Count; i++)
+                        {
+                            var item = Report.RecommendedMajors[i];
+                            <tr>
+                                <td class="text-center font-weight-bold">@(i + 1)</td>
+                                <td class="major-name-cell">@item.MajorName</td>
+                                <td class="branch-cell">@item.BranchName</td>
+                                <td class="stars-cell">
+                                    @for (int s = 0; s < item.Stars; s++)
+                                    {
+                                        <span class="star-gold">★</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @RenderPageFooter(11)
+    </div>
+
+    @* ==========================================
+       صفحه ۱۲: رشته‌های دارای فاصله با ویژگی‌های فردی (↓↓↓)
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(12)
+
+        <div class="page-body">
+            <div class="section-title-banner">
+                <span class="banner-icon">📉</span>
+                <h2>وضعیت شما در سایر رشته‌ها (رشته‌های دارای فاصله)</h2>
+            </div>
+            <p class="section-guide-text">
+                در جدول زیر لیست رشته‌هایی که کمترین همخوانی را با ویژگی‌های روانشناختی شما داشته‌اند ذکر شده است. انتخاب این رشته‌ها به دلیل احتمال بالای فرسودگی و عدم رضایت توصیه نمی‌گردد:
+            </p>
+
+            <div class="distance-table-container">
+                <table class="custom-report-table distant-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">ردیف</th>
+                            <th style="width: 42%;">نام رشته</th>
+                            <th style="width: 25%;">شاخه مربوطه</th>
+                            <th style="width: 25%;">میزان فاصله با روحیات شما</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Report.DistantMajors.Count; i++)
+                        {
+                            var item = Report.DistantMajors[i];
+                            <tr>
+                                <td class="text-center font-weight-bold">@(i + 1)</td>
+                                <td class="major-name-cell">@item.MajorName</td>
+                                <td class="branch-cell">@item.BranchName</td>
+                                <td class="arrows-cell">
+                                    @for (int a = 0; a < item.DistanceArrows; a++)
+                                    {
+                                        <span class="arrow-red">↓</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @RenderPageFooter(12)
+    </div>
+
+    @* ==========================================
+       صفحه ۱۳: نظریه نهایی و تحلیل هوش مصنوعی و جمع‌بندی
+       ========================================== *@
+    <div class="report-page">
+        @RenderPageHeader(13)
+
+        <div class="page-body">
+            <div class="section-title-banner ai-banner">
+                <span class="banner-icon">🤖</span>
+                <h2>نظریه و ارزیابی نهایی هوش مصنوعی انتخاب رشته (سامانه نوین)</h2>
+            </div>
+
+            <div class="ai-advice-container">
+                <div class="ai-box-content">
+                    <p style="white-space: pre-line; line-height: 2.2;">
+                        @(Report.AiFinalGuidance ?? "تحلیل هوش مصنوعی برای این آزمون ثبت شده و آماده بهره‌برداری مشاوره‌ای می‌باشد.")
+                    </p>
+                </div>
+            </div>
+
+            <div class="signature-box mt-6">
+                <div class="signature-col">
+                    <span>امضاء و تایید دانش‌آموز:</span>
+                    <div class="sign-line"></div>
+                </div>
+                <div class="signature-col">
+                    <span>امضاء ولی دانش‌آموز:</span>
+                    <div class="sign-line"></div>
+                </div>
+                <div class="signature-col">
+                    <span>مهر و امضاء مشاور تحصیلی:</span>
+                    <div class="sign-line"></div>
+                </div>
+            </div>
+        </div>
+
+        @RenderPageFooter(13)
+    </div>
+</div>
+
+@* ==========================================
+   متدهای کمکی جهت رندر هدر، فوتر و گیج عقربه‌ای
+   ========================================== *@
+@code {
+    [Parameter] public ComprehensiveCareerReport Report { get; set; } = new();
+    [Parameter] public EventCallback OnBack { get; set; }
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private RenderFragment RenderPageHeader(int pageNum) => __builder =>
+    {
+        <div class="page-header">
+            <div class="header-logo-side">
+                <span class="brand-title">سامانه هدایت تحصیلی نوین</span>
+            </div>
+            <div class="header-student-meta">
+                <span><strong>نام و نام خانوادگی:</strong> @Report.StudentName</span>
+                <span><strong>مشاور:</strong> @Report.CounselorName</span>
+                <span><strong>موسسه:</strong> @Report.InstitutionName</span>
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderPageFooter(int pageNum) => __builder =>
+    {
+        <div class="page-footer">
+            <span class="footer-site">novin-app.ir</span>
+            <span class="footer-title">سامانه هدایت تحصیلی و شغلی دانش‌آموزی</span>
+            <span class="footer-page-num">@pageNum | صفحه</span>
+        </div>
+    };
+
+    private RenderFragment RenderSpeedometerGauge(int percentage) => __builder =>
+    {
+        // محاسبه زاویه عقربه: از 180 درجه تا 360 درجه (نیم دایره بالا)
+        double clamped = Math.Clamp(percentage, 0, 100);
+        double angleDeg = 180 + (clamped / 100.0) * 180.0;
+        double rad = angleDeg * Math.PI / 180.0;
+        double cx = 100, cy = 95, r = 60;
+        double xTip = cx + (r - 10) * Math.Cos(rad);
+        double yTip = cy + (r - 10) * Math.Sin(rad);
+
+        <div class="speedometer-box">
+            <svg viewBox="0 0 200 125" class="speedometer-svg">
+                <defs>
+                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#e53935" />
+                        <stop offset="40%" stop-color="#fb8c00" />
+                        <stop offset="70%" stop-color="#fdd835" />
+                        <stop offset="100%" stop-color="#43a047" />
+                    </linearGradient>
+                </defs>
+                <!-- قوس پس‌زمینه رنگی -->
+                <path d="M 25,95 A 75,75 0 0,1 175,95" fill="none" stroke="url(#gaugeGradient)" stroke-width="16" stroke-linecap="round" />
+                
+                <!-- خط عقربه -->
+                <line x1="@cx" y1="@cy" x2="@xTip.ToString("F1")" y2="@yTip.ToString("F1")" stroke="#212121" stroke-width="4" stroke-linecap="round" />
+                <circle cx="@cx" cy="@cy" r="7" fill="#212121" />
+                <circle cx="@cx" cy="@cy" r="3" fill="#ffffff" />
+            </svg>
+            <div class="gauge-score-text">
+                <span class="score-number">@percentage%</span>
+                <span class="score-label">انطباق</span>
+            </div>
+        </div>
+    };
+}
+
+<style>
+    /* استایل‌های کلی کارنامه چاپی و دانلودی */
+    .comprehensive-report-container {
+        font-family: Sahel, Vazir, 'Segoe UI', Tahoma, sans-serif;
+        color: #212121;
+        direction: rtl;
+        background-color: #f5f7fb;
+        padding: 20px;
+    }
+
+    .report-toolbar {
+        max-width: 900px;
+        margin: 0 auto 20px auto;
+        background: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    }
+
+    /* ساختار هر صفحه گزارش بر مبنای ابعاد A4 */
+    .report-page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto 30px auto;
+        background: #ffffff;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        box-sizing: border-box;
+        padding: 15mm 15mm 15mm 15mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+    }
+
+    /* صفحه جلد */
+    .page-cover {
+        background: linear-gradient(145deg, #f0f7ff 0%, #ffffff 100%);
+        overflow: hidden;
+    }
+
+    .cover-art-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 45%;
+        overflow: hidden;
+    }
+
+    .cover-art-shape {
+        position: absolute;
+        border-radius: 50%;
+    }
+
+    .shape-blue {
+        width: 320px;
+        height: 320px;
+        background: #0288d1;
+        top: -100px;
+        left: -80px;
+    }
+
+    .shape-yellow {
+        width: 260px;
+        height: 260px;
+        background: #c0ca33;
+        top: 60px;
+        left: -120px;
+    }
+
+    .shape-green {
+        width: 280px;
+        height: 280px;
+        background: #8bc34a;
+        top: 140px;
+        left: 30px;
+    }
+
+    .shape-cyan {
+        width: 240px;
+        height: 240px;
+        background: #00acc1;
+        top: 30px;
+        right: 80px;
+        opacity: 0.15;
+    }
+
+    .cover-content {
+        margin-top: 50mm;
+        text-align: right;
+        position: relative;
+        z-index: 2;
+    }
+
+    .cover-badge {
+        display: inline-block;
+        background-color: #e3f2fd;
+        color: #0d47a1;
+        font-size: 14px;
+        font-weight: bold;
+        padding: 6px 16px;
+        border-radius: 20px;
+        margin-bottom: 20px;
+    }
+
+    .cover-title {
+        font-size: 32px;
+        font-weight: 900;
+        color: #0d47a1;
+        margin-bottom: 15px;
+        line-height: 1.4;
+    }
+
+    .cover-subtitle {
+        font-size: 16px;
+        color: #546e7a;
+        margin-bottom: 40px;
+    }
+
+    .cover-info-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 500px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px dashed #e0e0e0;
+        font-size: 15px;
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        color: #757575;
+        font-weight: 500;
+    }
+
+    .info-val {
+        color: #0d47a1;
+        font-weight: bold;
+    }
+
+    .page-footer-single {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #9e9e9e;
+        border-top: 1px solid #eeeeee;
+        padding-top: 8px;
+    }
+
+    /* سربرگ و پاورقی صفحات */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #0d47a1;
+        padding-bottom: 10px;
+        margin-bottom: 18px;
+        font-size: 12px;
+    }
+
+    .brand-title {
+        font-weight: 900;
+        color: #0d47a1;
+        font-size: 14px;
+    }
+
+    .header-student-meta {
+        display: flex;
+        gap: 15px;
+        color: #37474f;
+    }
+
+    .page-body {
+        flex: 1;
+    }
+
+    .page-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid #cfd8dc;
+        padding-top: 8px;
+        font-size: 11px;
+        color: #78909c;
+        margin-top: 20px;
+    }
+
+    .footer-site {
+        direction: ltr;
+    }
+
+    /* بنرهای عنوان بخش‌ها */
+    .section-title-banner {
+        background: linear-gradient(90deg, #f0f4f8 0%, #e1e8ed 100%);
+        border-right: 6px solid #0d47a1;
+        padding: 10px 16px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .section-title-banner.compact {
+        padding: 6px 12px;
+        margin-bottom: 12px;
+    }
+
+    .section-title-banner h2 {
+        font-size: 16px;
+        font-weight: bold;
+        color: #102a43;
+        margin: 0;
+    }
+
+    .section-title-banner.ai-banner {
+        background: linear-gradient(90deg, #f3e5f5 0%, #ede7f6 100%);
+        border-right-color: #6a1b9a;
+    }
+
+    .section-title-banner.ai-banner h2 {
+        color: #4a148c;
+    }
+
+    .section-guide-text {
+        font-size: 13px;
+        line-height: 1.8;
+        color: #486581;
+        margin-bottom: 16px;
+    }
+
+    /* صفحه ۲: مقدمه و فهرست */
+    .page-two-cols {
+        display: flex;
+        gap: 20px;
+    }
+
+    .intro-column {
+        flex: 1.2;
+    }
+
+    .toc-column {
+        flex: 0.8;
+    }
+
+    .intro-text-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px;
+        font-size: 13px;
+        line-height: 2;
+        color: #334e68;
+    }
+
+    .intro-text-box p {
+        margin-bottom: 14px;
+        text-align: justify;
+    }
+
+    .toc-box {
+        background: #eef2f6;
+        border-radius: 12px;
+        padding: 18px;
+        border: 1px solid #d9e2ec;
+    }
+
+    .toc-title {
+        font-weight: bold;
+        color: #102a43;
+        font-size: 14px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #bcccdc;
+    }
+
+    .toc-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 12px;
+        line-height: 2;
+        color: #243b53;
+    }
+
+    .toc-sublist {
+        list-style: none;
+        padding-right: 18px;
+        color: #486581;
+    }
+
+    .check-icon {
+        color: #2e7d32;
+        font-weight: bold;
+        margin-left: 6px;
+    }
+
+    /* صفحه ۳: شخصیت */
+    .personality-narrative-card {
+        background: #f0f7ff;
+        border-radius: 12px;
+        padding: 22px;
+        border: 1px solid #bbdefb;
+        font-size: 14px;
+        line-height: 2.2;
+        color: #1a365d;
+        text-align: justify;
+    }
+
+    .traits-highlights-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+
+    .trait-highlight-box {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .trait-icon {
+        font-size: 26px;
+        margin-bottom: 8px;
+    }
+
+    .trait-title {
+        font-weight: bold;
+        font-size: 14px;
+        color: #0d47a1;
+        margin-bottom: 6px;
+    }
+
+    .trait-desc {
+        font-size: 12px;
+        color: #4a5568;
+        line-height: 1.7;
+    }
+
+    /* صفحه ۴: وضعیت ۷ شاخه */
+    .branch-summary-tables {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .branch-status-row {
+        display: flex;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 52px;
+    }
+
+    .branch-header-col {
+        width: 140px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        text-align: center;
+        padding: 6px;
+    }
+
+    .branch-suitability-col {
+        width: 90px;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+    }
+
+    .suitability-label {
+        font-size: 9px;
+        opacity: 0.9;
+    }
+
+    .suitability-val {
+        font-size: 13px;
+        font-weight: 900;
+    }
+
+    .branch-content-col {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .good-majors {
+        background-color: #f1f8e9;
+        border-left: 1px solid #dcedc8;
+    }
+
+    .bad-majors {
+        background-color: #ffebee;
+    }
+
+    .col-title {
+        font-weight: bold;
+        color: #37474f;
+        margin-bottom: 2px;
+        font-size: 10px;
+    }
+
+    .majors-text {
+        color: #263238;
+        line-height: 1.6;
+    }
+
+    /* صفحه ۵: نمودار ستونی ۱۸ حوزه */
+    .domains-barchart-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: #f8fafc;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .barchart-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+    }
+
+    .barchart-meta {
+        width: 190px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .domain-id {
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 10px;
+        font-weight: bold;
+        border-radius: 4px;
+        padding: 2px 5px;
+    }
+
+    .domain-title {
+        font-weight: bold;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .barchart-bar-track {
+        flex: 1;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 7px;
+        overflow: hidden;
+    }
+
+    .barchart-bar-fill {
+        height: 100%;
+        border-radius: 7px;
+        transition: width 0.3s ease;
+    }
+
+    .barchart-percent {
+        width: 45px;
+        font-weight: 900;
+        text-align: left;
+        font-size: 13px;
+    }
+
+    /* صفحات ۶ تا ۱۰: کارتهای حوزه‌ها با گیج عقربه‌ای */
+    .domain-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .domain-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        background: white;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .domain-card-header {
+        background: #f0f4f8;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .domain-badge-number {
+        background: #0d47a1;
+        color: white;
+        font-size: 11px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .domain-name {
+        margin: 0;
+        font-size: 13px;
+        font-weight: bold;
+        color: #102a43;
+    }
+
+    .domain-card-body {
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .domain-gauge-side {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .speedometer-box {
+        width: 140px;
+        position: relative;
+        text-align: center;
+    }
+
+    .speedometer-svg {
+        width: 100%;
+        height: auto;
+    }
+
+    .gauge-score-text {
+        position: absolute;
+        bottom: 4px;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .score-number {
+        font-size: 16px;
+        font-weight: 900;
+        color: #102a43;
+    }
+
+    .score-label {
+        font-size: 9px;
+        color: #627d98;
+    }
+
+    .domain-description {
+        font-size: 11px;
+        line-height: 1.7;
+        color: #334e68;
+        margin-bottom: 8px;
+        text-align: justify;
+    }
+
+    .domain-jobs-box {
+        background: #f8fafc;
+        border-radius: 6px;
+        padding: 8px;
+        border: 1px solid #f1f5f9;
+        font-size: 10px;
+    }
+
+    .domain-jobs-box strong {
+        color: #0d47a1;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .jobs-list {
+        margin: 0;
+        color: #475569;
+        line-height: 1.6;
+    }
+
+    /* جداول ستاره‌دار و فاصله‌دار */
+    .custom-report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .custom-report-table th {
+        background: #0d47a1;
+        color: white;
+        padding: 10px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .custom-report-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .custom-report-table tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+
+    .major-name-cell {
+        font-weight: bold;
+        color: #1e293b;
+    }
+
+    .branch-cell {
+        color: #64748b;
+    }
+
+    .stars-cell {
+        text-align: center;
+        letter-spacing: 2px;
+    }
+
+    .star-gold {
+        color: #f59e0b;
+        font-size: 14px;
+    }
+
+    .arrows-cell {
+        text-align: center;
+        letter-spacing: 2px;
+    }
+
+    .arrow-red {
+        color: #dc2626;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    /* بخش نظریه هوش مصنوعی */
+    .ai-advice-container {
+        background: #faf5ff;
+        border: 2px solid #e9d5ff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(106, 27, 154, 0.04);
+    }
+
+    .ai-box-content {
+        font-size: 13px;
+        color: #3b0764;
+    }
+
+    .signature-box {
+        display: flex;
+        justify-content: space-around;
+        padding-top: 30px;
+    }
+
+    .signature-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 12px;
+        color: #475569;
+        font-weight: bold;
+    }
+
+    .sign-line {
+        width: 140px;
+        height: 1px;
+        border-bottom: 1px dashed #94a3b8;
+        margin-top: 40px;
+    }
+
+    /* قوانین پرینت مرورگر برای صدور PDF بدون حاشیه و استاندارد */
+    @@media print {
+        body, html {
+            background-color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .no-print, .mud-appbar, .mud-drawer, nav, header {
+            display: none !important;
+        }
+
+        .comprehensive-report-container {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .report-page {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 12mm 15mm 12mm 15mm !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            height: 297mm !important;
+            box-sizing: border-box !important;
+        }
+
+        @@page {
+            size: A4 portrait;
+            margin: 0;
+        }
+    }
+</style>

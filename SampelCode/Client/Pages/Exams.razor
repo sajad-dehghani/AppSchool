@@ -1,0 +1,559 @@
+@page "/Exams"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Common
+@using NovinApp.Shared.DTOs.Exams
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject IDialogService dialogService
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize(Roles = $"{UserRoles.SystemAdmin},{UserRoles.SchoolManager},{UserRoles.Consultant}")]
+
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.Quiz" Class="ml-2 align-middle" />
+                مدیریت آزمون‌ها و کارنامه‌ها
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                تعریف آزمون، مشاهده کارنامه داوطلبان، تحلیل آماری و محاسبه رتبه‌بندی
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateModal" Class="font-weight-bold">
+                تعریف آزمون جدید
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Style="color: white; border-color: white;"
+                       StartIcon="@Icons.Material.Filled.CloudUpload" Href="/Import">
+                ایمپورت نتایج اکسل
+            </MudButton>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center my-12">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (!exams.Any())
+{
+    <MudCard Elevation="2" Class="pa-8 my-6 rounded-xl text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Quiz" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
+        <MudText Typo="Typo.h6" Class="font-weight-bold">هیچ آزمونی هنوز تعریف نشده است</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-4">
+            برای ثبت نتایج دانش‌آموزان و صدور کارنامه، ابتدا یک آزمون ایجاد نمایید.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateModal">
+            ایجاد اولین آزمون
+        </MudButton>
+    </MudCard>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var exam in exams)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Elevation="2" Class="rounded-xl h-100 d-flex flex-column justify-space-between modern-card">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                                <MudIcon Icon="@Icons.Material.Filled.Assignment" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Class="font-weight-bold">@exam.Title</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                مرحله @exam.StageNumber | @(exam.Provider ?? "نوین") | سال @(exam.AcademicYear ?? "۱۴۰۳-۱۴۰۴")
+                            </MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => OpenEditModal(exam)">ویرایش</MudMenuItem>
+                                @if (UserProfileState.IsSystemAdmin)
+                                {
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error" OnClick="() => DeleteExam(exam)">حذف آزمون</MudMenuItem>
+                                }
+                            </MudMenu>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+
+                    <MudCardContent>
+                        <div class="d-flex justify-space-between align-center my-2 pa-2 rounded-lg bg-light">
+                            <span class="text-secondary text-sm">تعداد شرکت‌کنندگان:</span>
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">
+                                @exam.ParticipantsCount داوطلب
+                            </MudChip>
+                        </div>
+                        <div class="d-flex justify-space-between align-center text-sm text-secondary">
+                            <span>تاریخ برگزاری:</span>
+                            <span>@(exam.ExamDate?.ToString("yyyy/MM/dd") ?? "تعیین نشده")</span>
+                        </div>
+                    </MudCardContent>
+
+                    <MudCardActions Class="pa-3 border-t-1 d-flex justify-space-between flex-wrap gap-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.People" OnClick="() => OpenResultsModal(exam)">
+                            کارنامه‌ها (@exam.ParticipantsCount)
+                        </MudButton>
+                        <div class="d-flex gap-1">
+                            <MudIconButton Icon="@Icons.Material.Filled.BarChart" Color="Color.Info" Size="Size.Small"
+                                           Title="تحلیل و آمار" OnClick="() => OpenAnalyticsModal(exam)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Calculate" Color="Color.Success" Size="Size.Small"
+                                           Title="محاسبه رتبه‌ها" OnClick="() => CalculateRanks(exam)" />
+                        </div>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@* دیالوگ ثبت / ویرایش آزمون *@
+<MudDialog @bind-Visible="isModalVisible" MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">
+            @(isEditMode ? "ویرایش آزمون" : "تعریف آزمون جدید")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="formExam.Title" Label="عنوان آزمون *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" />
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudTextField @bind-Value="formExam.Provider" Label="برگزارکننده (گزینه دو، قلم‌چی، ...)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField @bind-Value="formExam.StageNumber" Label="شماره مرحله" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudTextField @bind-Value="formExam.AcademicYear" Label="سال تحصیلی (مثال: ۱۴۰۳-۱۴۰۴)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudDatePicker @bind-Date="formExam.ExamDate" Label="تاریخ برگزاری" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+        <MudTextField @bind-Value="formExam.Description" Label="توضیحات (اختیاری)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="() => isModalVisible = false">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveExam" Disabled="string.IsNullOrWhiteSpace(formExam.Title)">
+            ذخیره
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ مشاهده نتایج و داوطلبان آزمون *@
+<MudDialog @bind-Visible="isResultsModalVisible" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">
+            نتایج و کارنامه‌های @currentExamTitle
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudTextField @bind-Value="resultsSearch" Placeholder="جستجوی کد ملی..."
+                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                           OnKeyUp="FilterResults" Style="max-width: 250px;" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Calculate" OnClick="() => CalculateRanks(currentExam)">
+                محاسبه مجدد رتبه‌ها
+            </MudButton>
+        </div>
+
+        @if (isLoadingResults)
+        {
+            <div class="d-flex justify-center my-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (!filteredResults.Any())
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Filled">کارنامه‌ای برای این آزمون ثبت نشده است.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@filteredResults" Hover="true" Dense="true" Striped="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>نام داوطلب</MudTh>
+                    <MudTh>کد ملی</MudTh>
+                    <MudTh>مدرسه</MudTh>
+                    <MudTh>درصد کل</MudTh>
+                    <MudTh>تراز کل</MudTh>
+                    <MudTh>رتبه در مدرسه</MudTh>
+                    <MudTh>رتبه در کل</MudTh>
+                    <MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Class="font-weight-bold">@context.FullName</MudTd>
+                    <MudTd>@context.NationalCode</MudTd>
+                    <MudTd>@(context.SchoolName ?? "-")</MudTd>
+                    <MudTd Class="font-weight-bold">@context.TotalPercent.ToString("F1")%</MudTd>
+                    <MudTd Class="font-weight-bold text-primary">@context.TotalTaraz.ToString("N0")</MudTd>
+                    <MudTd>@(context.RankInSchool > 0 ? context.RankInSchool.ToString() : "-")</MudTd>
+                    <MudTd>@(context.RankInTotal > 0 ? context.RankInTotal.ToString() : "-")</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Assessment" OnClick="() => ShowReportCard(context)">
+                            مشاهده کارنامه
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="() => isResultsModalVisible = false">بستن</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ آنالیز آماری آزمون *@
+<MudDialog @bind-Visible="isAnalyticsModalVisible" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">
+            آنالیز آماری @currentExamTitle
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoadingAnalytics || currentAnalytics == null)
+        {
+            <div class="d-flex justify-center my-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid Spacing="2" Class="mb-4">
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg bg-light border-1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">شرکت‌کنندگان</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@currentAnalytics.TotalParticipants نفر</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg bg-light border-1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">میانگین درصد کل</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold text-info">@currentAnalytics.AveragePercent%</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg bg-light border-1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">بالاترین تراز</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold text-primary">@currentAnalytics.MaxTaraz.ToString("N0")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center rounded-lg bg-light border-1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">میانگین تراز</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold text-success">@currentAnalytics.AverageTaraz.ToString("N0")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @if (currentAnalytics.Subjects.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">میانگین نمرات دروس</MudText>
+                <MudTable Items="@currentAnalytics.Subjects" Dense="true" Elevation="0" Outlined="true" Class="mb-4">
+                    <HeaderContent>
+                        <MudTh>درس</MudTh>
+                        <MudTh>میانگین درصد</MudTh>
+                        <MudTh>بالاترین درصد</MudTh>
+                        <MudTh>پایین‌ترین درصد</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Class="font-weight-bold">@context.SubjectName</MudTd>
+                        <MudTd>@context.AveragePercent%</MudTd>
+                        <MudTd class="text-success font-weight-bold">@context.MaxPercent%</MudTd>
+                        <MudTd class="text-error font-weight-bold">@context.MinPercent%</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @if (currentAnalytics.TopStudents.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">رتبه‌های برتر آزمون</MudText>
+                <MudTable Items="@currentAnalytics.TopStudents" Dense="true" Elevation="0" Outlined="true">
+                    <HeaderContent>
+                        <MudTh>رتبه کل</MudTh>
+                        <MudTh>نام دانش‌آموز</MudTh>
+                        <MudTh>مدرسه</MudTh>
+                        <MudTh>تراز کل</MudTh>
+                        <MudTh>درصد کل</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">#@context.RankInTotal</MudChip></MudTd>
+                        <MudTd Class="font-weight-bold">@context.FullName</MudTd>
+                        <MudTd>@(context.SchoolName ?? "-")</MudTd>
+                        <MudTd Class="font-weight-bold text-primary">@context.TotalTaraz.ToString("N0")</MudTd>
+                        <MudTd Class="font-weight-bold">@context.TotalPercent%</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="() => isAnalyticsModalVisible = false">بستن</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<ExamDto> exams = new();
+    private bool isLoading = true;
+
+    // مودال ثبت و ویرایش
+    private bool isModalVisible = false;
+    private bool isEditMode = false;
+    private int currentEditId = 0;
+    private CreateExamDto formExam = new();
+
+    // مودال نتایج
+    private bool isResultsModalVisible = false;
+    private bool isLoadingResults = false;
+    private ExamDto? currentExam;
+    private string currentExamTitle = "";
+    private List<ExamStudentResultItemDto> examResults = new();
+    private List<ExamStudentResultItemDto> filteredResults = new();
+    private string resultsSearch = "";
+
+    // مودال آنالیز
+    private bool isAnalyticsModalVisible = false;
+    private bool isLoadingAnalytics = false;
+    private ExamAnalyticsDto? currentAnalytics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExams();
+    }
+
+    private async Task LoadExams()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<ExamDto>>>("api/exams");
+            if (res?.Success == true && res.Data != null)
+            {
+                exams = res.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در دریافت لیست آزمون‌ها: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        isEditMode = false;
+        formExam = new CreateExamDto { StageNumber = 1, AcademicYear = "۱۴۰۳-۱۴۰۴", ExamDate = DateTime.Today };
+        isModalVisible = true;
+    }
+
+    private void OpenEditModal(ExamDto exam)
+    {
+        isEditMode = true;
+        currentEditId = exam.Id;
+        formExam = new CreateExamDto
+        {
+            Title = exam.Title,
+            Provider = exam.Provider,
+            StageNumber = exam.StageNumber,
+            AcademicYear = exam.AcademicYear,
+            ExamDate = exam.ExamDate,
+            Description = exam.Description
+        };
+        isModalVisible = true;
+    }
+
+    private async Task SaveExam()
+    {
+        try
+        {
+            if (isEditMode)
+            {
+                var updateDto = new UpdateExamDto
+                {
+                    Id = currentEditId,
+                    Title = formExam.Title,
+                    Provider = formExam.Provider,
+                    StageNumber = formExam.StageNumber,
+                    AcademicYear = formExam.AcademicYear,
+                    ExamDate = formExam.ExamDate,
+                    Description = formExam.Description
+                };
+                var res = await _http.PutAsJsonAsync($"api/exams/{currentEditId}", updateDto);
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<ExamDto>>();
+                if (apiRes?.Success == true)
+                {
+                    snackBar.Add("آزمون به‌روزرسانی شد.", Severity.Success);
+                    isModalVisible = false;
+                    await LoadExams();
+                }
+            }
+            else
+            {
+                var res = await _http.PostAsJsonAsync("api/exams", formExam);
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<ExamDto>>();
+                if (apiRes?.Success == true)
+                {
+                    snackBar.Add("آزمون با موفقیت ایجاد شد.", Severity.Success);
+                    isModalVisible = false;
+                    await LoadExams();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در ذخیره‌سازی: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteExam(ExamDto exam)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف آزمون «{exam.Title}» و کلیه نتایج و کارنامه‌های آن اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var res = await _http.DeleteAsync($"api/exams/{exam.Id}");
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true)
+                {
+                    snackBar.Add("آزمون حذف گردید.", Severity.Success);
+                    await LoadExams();
+                }
+            }
+            catch (Exception ex)
+            {
+                snackBar.Add($"خطا در حذف: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenResultsModal(ExamDto exam)
+    {
+        currentExam = exam;
+        currentExamTitle = exam.Title;
+        isResultsModalVisible = true;
+        isLoadingResults = true;
+        resultsSearch = "";
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<ExamStudentResultItemDto>>>($"api/exams/{exam.Id}/results");
+            if (res?.Success == true && res.Data != null)
+            {
+                examResults = res.Data;
+                filteredResults = examResults;
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در دریافت نتایج: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingResults = false;
+        }
+    }
+
+    private void FilterResults()
+    {
+        if (string.IsNullOrWhiteSpace(resultsSearch))
+        {
+            filteredResults = examResults;
+        }
+        else
+        {
+            var s = resultsSearch.Trim();
+            filteredResults = examResults.Where(r => r.NationalCode.Contains(s) || r.FullName.Contains(s)).ToList();
+        }
+    }
+
+    private async Task ShowReportCard(ExamStudentResultItemDto studentResult)
+    {
+        if (currentExam == null) return;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<ReportCardDto>>($"api/exams/{currentExam.Id}/report-card/{studentResult.StudentProfileId}");
+            if (res?.Success == true && res.Data != null)
+            {
+                var parameters = new DialogParameters { ["ReportCard"] = res.Data };
+                var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+                await dialogService.ShowAsync<ReportCardDialog>("کارنامه تحلیلی", parameters, options);
+            }
+            else
+            {
+                snackBar.Add(res?.Message ?? "کارنامه یافت نشد.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در دریافت کارنامه: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenAnalyticsModal(ExamDto exam)
+    {
+        currentExam = exam;
+        currentExamTitle = exam.Title;
+        isAnalyticsModalVisible = true;
+        isLoadingAnalytics = true;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<ExamAnalyticsDto>>($"api/exams/{exam.Id}/analytics");
+            if (res?.Success == true && res.Data != null)
+            {
+                currentAnalytics = res.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در دریافت آنالیز: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingAnalytics = false;
+        }
+    }
+
+    private async Task CalculateRanks(ExamDto? exam)
+    {
+        if (exam == null) return;
+        try
+        {
+            var res = await _http.PostAsync($"api/exams/{exam.Id}/calculate-ranks", null);
+            var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            if (apiRes?.Success == true)
+            {
+                snackBar.Add("محاسبه رتبه‌ها و میانگین‌ها با موفقیت انجام شد.", Severity.Success);
+                if (isResultsModalVisible)
+                {
+                    await OpenResultsModal(exam);
+                }
+            }
+            else
+            {
+                snackBar.Add(apiRes?.Message ?? "خطا در محاسبه", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+    }
+}

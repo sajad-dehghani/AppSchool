@@ -1,361 +1,359 @@
 @page "/Profile"
 @inject IJSRuntime JsRuntime
-@inject MudBlazor.ISnackbar snackBar
-@using System.Globalization
+@inject ISnackbar snackBar
 @inject NavigationManager nav
 @using Microsoft.AspNetCore.Authorization
+@using MudBlazor
 @using NovinApp.Client.Component
 @using NovinApp.Client.Service
 @using NovinApp.Shared
+@using NovinApp.Shared.Constants
 @inject IDialogService Dialog
 @inject HttpClient _httpClient
 @inject UserProfileStateService UserProfileState
 @attribute [Authorize]
 
-@*<LoadingScreen>*@
-<MudPaper Elevation="25" Class="pa-3">
-    <MudText Align="Align.Center" Typo="Typo.h5">اطلاعات حساب کاربری</MudText>
-</MudPaper>
-<MudDivider DividerType="DividerType.Inset" />
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Class="ml-2 align-middle" />
+                پروفایل و اطلاعات حساب کاربری
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                مشاهده و ویرایش مشخصات فردی، تصویر نمایه و رمز عبور
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Class="text-primary font-weight-bold" OnClick="GoToBack">
+            بازگشت
+        </MudButton>
+    </div>
+</div>
 
-<EditForm Model="@data" OnValidSubmit="Save">
-    <MudPaper Elevation="25" Class="p-2 mt-2">
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center py-12">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        <MudText Typo="Typo.body1" Class="ms-3">در حال دریافت اطلاعات کاربر...</MudText>
+    </div>
+}
+else
+{
+    <EditForm Model="@data" OnValidSubmit="Save">
         <DataAnnotationsValidator />
-        <MudGrid Class="mt-1 pa-4">
-
-            @* ===== بخش ۱: عکس پروفایل ===== *@
-            <MudItem md="12" xs="12">
-                <MudCard Elevation="0" Class="d-flex flex-column align-center justify-center pa-4">
-                    <MudText Align="Align.Center" Class="rounded-circle mb-4">
+        <MudGrid Spacing="3">
+            @* کارت سمت راست: تصویر پروفایل و مشخصات کلیدی *@
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="3" Class="pa-6 rounded-2xl d-flex flex-column align-center text-center">
+                    <div class="profile-avatar-container mb-4 position-relative">
                         @if (!string.IsNullOrEmpty(data.pic))
                         {
-                            <MudImage Src="@data.pic" Class="rounded-circle" Elevation="5" Height="130" Width="130" />
+                            <MudAvatar Style="width: 140px; height: 140px;" Elevation="4">
+                                <MudImage Src="@data.pic" Style="width: 100%; height: 100%; object-fit: cover;" />
+                            </MudAvatar>
                         }
                         else
                         {
-                            <MudImage Src="img/no_pic.jpg" Class="rounded-circle" Elevation="5" Width="130" Height="130" />
+                            <MudAvatar Color="Color.Primary" Style="width: 140px; height: 140px; font-size: 3rem;" Elevation="4">
+                                @(string.IsNullOrEmpty(data.fname) ? "U" : data.fname.Substring(0, 1))
+                            </MudAvatar>
                         }
+                    </div>
+
+                    <MudText Typo="Typo.h6" Class="font-weight-bold text-dark mb-1">
+                        @(string.IsNullOrEmpty(data.fname) ? "کاربر گرامی" : data.fname)
+                    </MudText>
+                    
+                    <MudChip T="string" Color="@GetRoleColor(data.Rool)" Variant="Variant.Filled" Size="Size.Small" Class="mb-4">
+                        @UserRoles.GetPersianTitle(data.Rool)
+                    </MudChip>
+
+                    <div class="d-flex gap-2 flex-wrap justify-center mb-2">
+                        <label for="profile-pic-input" class="label-wrapper">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PhotoCamera"
+                                       Size="Size.Small" HtmlTag="span">
+                                تغییر عکس
+                            </MudButton>
+                            <InputFile id="profile-pic-input" accept="image/*" OnChange="OnChange_pic" class="d-none" />
+                        </label>
+
+                        @if (!string.IsNullOrEmpty(data.pic))
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small" OnClick="Del_pic">
+                                حذف عکس
+                            </MudButton>
+                        }
+                    </div>
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                        فرمت‌های مجاز: JPG, PNG | حداکثر حجم: ۲ مگابایت
                     </MudText>
 
-                    <MudStack Row="true" Spacing="2" Justify="Justify.Center">
-                        <label for="fileinput" class="label-wrapper">
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.CloudUpload"
-                                       Size="Size.Small"
-                                       HtmlTag="span">
-                                بارگذاری عکس
-                            </MudButton>
-                            <InputFile id="fileinput" accept="image/*" OnChange="OnChange_pic" class="custom-input-hide" />
-                        </label>
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Error"
-                                   StartIcon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
-                                   OnClick="Del_pic">
-                            حذف عکس
+                    <MudDivider Class="my-4 w-100" />
+
+                    <div class="w-100 text-start">
+                        <div class="d-flex justify-space-between mb-2">
+                            <span class="text-muted small">کد ملی:</span>
+                            <span class="font-weight-bold">@data.code_meli</span>
+                        </div>
+                        <div class="d-flex justify-space-between mb-2">
+                            <span class="text-muted small">وضعیت حساب:</span>
+                            <span class="@(data.active ? "text-success font-weight-bold" : "text-danger font-weight-bold")">
+                                @(data.active ? "فعال" : "غیرفعال")
+                            </span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(data.Moshaver) && data.Moshaver != "بدون مشاور")
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <span class="text-muted small">مشاور تحصیلی:</span>
+                                <span class="text-info font-weight-bold">@data.Moshaver</span>
+                            </div>
+                        }
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            @* فرم ویرایش اطلاعات سمت چپ *@
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="3" Class="pa-6 rounded-2xl">
+                    @* بخش ۱: اطلاعات فردی *@
+                    <div class="d-flex align-center gap-2 mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">اطلاعات فردی و هویتی</MudText>
+                    </div>
+
+                    <MudGrid Spacing="2" Class="mb-4">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="data.fname" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                          Required="true" Margin="Margin.Dense" For="@(() => data.fname)" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="data.code_meli" Label="کد ملی" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Required="true"
+                                          ReadOnly="@(!UserProfileState.IsSystemAdmin)"
+                                          Disabled="@(!UserProfileState.IsSystemAdmin)"
+                                          HelperText="@(UserProfileState.IsSystemAdmin ? "دسترسی مدیر سیستم: ویرایش مجاز است" : "🔒 کد ملی تنها توسط مدیر سیستم قابل ویرایش است")"
+                                          HelperTextOnFocus="true"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(UserProfileState.IsSystemAdmin ? Icons.Material.Filled.Edit : Icons.Material.Filled.Lock)" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="data.mobile" Label="شماره تلفن همراه" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" For="@(() => data.mobile)" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="data.gender" Label="جنسیت" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@("مرد")">مرد</MudSelectItem>
+                                <MudSelectItem Value="@("زن")">زن</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-4" />
+
+                    @* بخش ۲: امنیت و رمز عبور *@
+                    <div class="d-flex align-center gap-2 mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Secondary" />
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">امنیت و تغییر رمز عبور</MudText>
+                    </div>
+
+                    <MudGrid Spacing="2" Class="mb-4">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="newPassword" Label="رمز عبور جدید (در صورت تمایل به تغییر)"
+                                          Variant="Variant.Outlined" InputType="InputType.Password" Margin="Margin.Dense"
+                                          HelperText="در صورت خالی بودن، رمز عبور فعلی حفظ می‌شود" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="data.Rool" Label="نقش کاربری" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" ReadOnly="@(!UserProfileState.IsSystemAdmin)">
+                                <MudSelectItem Value="@(UserRoles.Student)">دانش‌آموز</MudSelectItem>
+                                <MudSelectItem Value="@(UserRoles.Consultant)">مشاور تحصیلی</MudSelectItem>
+                                <MudSelectItem Value="@(UserRoles.SchoolManager)">مدیر مدرسه</MudSelectItem>
+                                <MudSelectItem Value="@(UserRoles.SystemAdmin)">مدیر سیستم</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-4" />
+
+                    <div class="d-flex justify-end gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="GoToBack" Size="Size.Large">
+                            انصراف
                         </MudButton>
-                    </MudStack>
-                </MudCard>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit"
+                                   StartIcon="@Icons.Material.Filled.Save" Size="Size.Large" Disabled="isSaving">
+                            @if (isSaving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                <span>در حال ذخیره...</span>
+                            }
+                            else
+                            {
+                                <span>ذخیره تغییرات</span>
+                            }
+                        </MudButton>
+                    </div>
+                </MudPaper>
             </MudItem>
-
-            <MudItem md="12" xs="12">
-                <MudDivider DividerType="DividerType.Inset" Class="my-2" />
-            </MudItem>
-
-            @* ===== بخش ۲: اطلاعات هویتی ===== *@
-            <MudItem xs="12">
-                <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="mb-3 mr-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="ml-1" />
-                    اطلاعات هویتی
-                </MudText>
-            </MudItem>
-
-            <MudItem md="6" xs="12">
-                <MudTextField Style="text-align:right"
-                              T="string"
-                              Variant="Variant.Outlined"
-                              Label="نام کاربری"
-                              @bind-Value="@data.fname"
-                              For="@(() => data.fname)"
-                              Margin="Margin.Dense"
-                              Required="true"
-                              RequiredError="نام کاربری الزامی است"
-                              MaxLength="100"
-                              AdornmentIcon="@Icons.Material.Filled.Badge"
-                              Adornment="Adornment.Start" />
-            </MudItem>
-
-            <MudItem md="6" xs="12">
-                <MudTextField ReadOnly Style="text-align:right"
-                              T="string"
-                              Variant="Variant.Outlined"
-                              Label="کد ملی"
-                              @bind-Value="@data.code_meli"
-                              For="@(() => data.code_meli)"
-                              Margin="Margin.Dense"
-                              Required="true"
-                              RequiredError="کد ملی الزامی است"
-                              MaxLength="20"
-                              Mask="@(new RegexMask(@"\d{1,10}"))"
-                              AdornmentIcon="@Icons.Material.Filled.CreditCard"
-                              Adornment="Adornment.Start" />
-            </MudItem>
-
-            <MudItem md="6" xs="12">
-                <MudSelect T="string"
-                           Style="text-align:right"
-                           Variant="Variant.Outlined"
-                           Label="جنسیت"
-                           @bind-Value="@data.gender"
-                           For="@(() => data.gender)"
-                           Margin="Margin.Dense"
-                           Required="true"
-                           RequiredError="انتخاب جنسیت الزامی است"
-                           AdornmentIcon="@Icons.Material.Filled.Wc"
-                           Adornment="Adornment.Start">
-                    <MudSelectItem Value=@("مرد")>مرد</MudSelectItem>
-                    <MudSelectItem Value=@("زن")>زن</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-
-            <MudItem md="6" xs="12">
-                <MudTextField Style="text-align:right"
-                              T="string"
-                              Variant="Variant.Outlined"
-                              Label="شماره تماس"
-                              @bind-Value="@data.mobile"
-                              For="@(() => data.mobile)"
-                              Margin="Margin.Dense"
-                              Required="true"
-                              RequiredError="شماره تماس الزامی است"
-                              MaxLength="50"
-                              Mask="@(new RegexMask(@"\d{1,11}"))"
-                              AdornmentIcon="@Icons.Material.Filled.Phone"
-                              Adornment="Adornment.Start" />
-            </MudItem>
-
-            <MudItem md="12" xs="12">
-                <MudDivider DividerType="DividerType.Inset" Class="my-2" />
-            </MudItem>
-
-            @* ===== بخش ۳: اطلاعات امنیتی و دسترسی ===== *@
-            <MudItem xs="12">
-                <MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-3 mr-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" Class="ml-1" />
-                    اطلاعات امنیتی و دسترسی
-                </MudText>
-            </MudItem>
-
-            <MudItem md="6" xs="12" >
-                <MudTextField Style="text-align:right"
-                              T="string"
-                              Variant="Variant.Outlined"
-                              Label="رمز عبور"
-                              @bind-Value="@data.pass"
-                              For="@(() => data.pass)"
-                              Margin="Margin.Dense"
-                              Required="true"
-                              RequiredError="رمز عبور الزامی است"
-                              MaxLength="100"
-                              InputType="InputType.Password"
-                              AdornmentIcon="@Icons.Material.Filled.Lock"
-                              Adornment="Adornment.Start" />
-            </MudItem>
-
-            <MudItem md="6" xs="12">
-                <MudSelect T="string" ReadOnly
-                           Style="text-align:right"
-                           Variant="Variant.Outlined"
-                           Label="نقش کاربری"
-                           @bind-Value="@data.Rool"
-                           For="@(() => data.Rool)"
-                           Margin="Margin.Dense"
-                           Required="true"
-                           RequiredError="انتخاب نقش الزامی است"
-                           AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
-                           Adornment="Adornment.Start">
-                    <MudSelectItem Value=@("دانش آموز")>
-                        <MudStack Row="true" Spacing="1">
-                            <MudIcon Icon="@Icons.Material.Filled.School" Size="Size.Small" />
-                            <MudText>دانش آموز</MudText>
-                        </MudStack>
-                    </MudSelectItem>
-                    <MudSelectItem Value=@("مشاور")>
-                        <MudStack Row="true" Spacing="1">
-                            <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
-                            <MudText>مشاور</MudText>
-                        </MudStack>
-                    </MudSelectItem>
-                    <MudSelectItem Value=@("مدیر")>
-                        <MudStack Row="true" Spacing="1">
-                            <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Small" />
-                            <MudText>مدیر</MudText>
-                        </MudStack>
-                    </MudSelectItem>
-                </MudSelect>
-            </MudItem>
-
-            @* فیلد وضعیت فعال - تمام عرض *@
-            <MudItem  md="6" xs="12">
-                <MudSwitch T="bool" ReadOnly="true"
-                           @bind-Value="@isActive"
-                           Color="Color.Success"
-                           Label="کاربر فعال باشد"
-                           Class="mt-2" />
-            </MudItem>
-
-            @* ===== بخش ۴: دکمه‌های ثبت و انصراف ===== *@
-            <MudItem xs="12">
-                <MudDivider DividerType="DividerType.Inset" Class="my-2" />
-                <MudCardActions Class="d-flex justify-end">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Class="ml-2"
-                               ButtonType="ButtonType.Submit"
-                               Size="Size.Large">
-                        @("بروزرسانی")
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Secondary"
-                               OnClick="GoToBack"
-                               StartIcon="@Icons.Material.Filled.ArrowBack"
-                               Size="Size.Large">
-                        انصراف
-                    </MudButton>
-                </MudCardActions>
-            </MudItem>
-
         </MudGrid>
-    </MudPaper>
-</EditForm>
+    </EditForm>
+}
 
-<style>
-    .label-wrapper:hover {
-        cursor: pointer;
-    }
-
-    .custom-input-hide {
-        width: 0;
-        height: 0;
-        overflow: hidden;
-    }
-</style>
 @code {
-  
+    private User data = new();
+    private string newPassword = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving = false;
 
-    private bool isActive = true;
-    protected IEnumerable<User> data_list = new List<User>();
-    private string _searchString = "";
-    private int selectedRowNumber = -1;
-    private int lastRowNumber = -1;
-    private bool NoEdite = true;
-    User data = new User();
-    public async Task<bool> OpenDialog(string txt)
-    {
-
-        var parameters = new DialogParameters();
-        parameters.Add("mytext", txt);
-        var dialog = await Dialog.ShowAsync<Alert_qoustion>("", parameters);
-
-        var result = await dialog.Result;
-
-        if (!result.Canceled)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-
-        }
-    }
-
-
-    ImageFile filesBase64_pic = new ImageFile();
-
-    async Task OnChange_pic(InputFileChangeEventArgs e)
-    {
-        if (e.File.Size / 1024 > 1024)
-        {
-            snackBar.Add("سایز عکس بیش از انداره بزرگ می باشد ", Severity.Warning);
-            return;
-        }
-        var file = e.File; // get the files selected by the users
-        //   var resizedFile = await file.RequestImageFileAsync(e.File.ContentType, int.MaxValue, int.MaxValue); // resize the image file
-        var buf = new byte[file.Size]; // allocate a buffer to fill with the file's data
-        using (var stream = file.OpenReadStream(int.MaxValue))
-        {
-            await stream.ReadAsync(buf); // copy the stream to the buffer
-        }
-        data.pic = $"data:{file.ContentType}; base64,{Convert.ToBase64String(buf)}";
-    }
-    void Del_pic()
-    {
-        data.pic = null;
-    }
-    protected override async Task OnParametersSetAsync()
-    {
-        await Btn_Refresh();
-        await InvokeAsync(() => StateHasChanged());
-    }
     protected override async Task OnInitializedAsync()
     {
-        UserProfileState.OnChange += StateHasChanged;
-
-        if (!UserProfileState.IsLoaded)
-            await UserProfileState.LoadUserAsync();
-
+        await LoadUserData();
     }
 
-    protected async Task Save()
+    private async Task LoadUserData()
     {
-
-
-        var respon = await _httpClient.PutAsJsonAsync("api/User", data);
-        if (respon.IsSuccessStatusCode)
-        {
-            snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
-            snackBar.Add("اطلاعات با موفقیت بروز رسانی شد", Severity.Success);
-            data = new User();
-            nav.NavigateTo("/Home");
-        }
-        else
-        {
-
-            snackBar.Configuration.PositionClass = Defaults.Classes.Position.BottomEnd;
-            snackBar.Add("ویرایش با خطا مواجه شد." + Environment.NewLine + "اطلاعات مورد نظر تغییر داشته مجدد امتحان کنید", Severity.Error);
-            //  personel = new Personel();
-
-        }
-
-    }
-    async Task Btn_Refresh()
-    {
+        isLoading = true;
         try
         {
-            data = await _httpClient.GetFromJsonAsync<User>($"api/User/{UserProfileState.CurrentUser.Id}");
-            if (data == null)
+            if (!UserProfileState.IsLoaded)
+                await UserProfileState.LoadUserAsync();
+
+            var currentId = UserProfileState.CurrentUser?.Id;
+            if (currentId.HasValue && currentId.Value > 0)
             {
-                await OpenDialog("خطا در دریافت اطلاعات مجدد امتحان کنید").ConfigureAwait(false);
-                nav.NavigateTo("/Home");
+                var user = await _httpClient.GetFromJsonAsync<User>($"api/User/{currentId.Value}");
+                if (user != null)
+                {
+                    data = user;
+                }
             }
-            isActive = data.active;
-
-            await InvokeAsync(() => StateHasChanged());
-
         }
-        catch
+        catch (Exception ex)
         {
+            snackBar.Add($"خطا در دریافت اطلاعات کاربر: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 
-            nav.NavigateTo("/Home");
+    private async Task OnChange_pic(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 2 * 1024 * 1024)
+        {
+            snackBar.Add("حجم فایل تصویر نباید بیشتر از ۲ مگابایت باشد.", Severity.Warning);
+            return;
         }
 
-    }
-    void GoToBack()
-    {
-        nav.NavigateTo("/Home");
+        try
+        {
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(2 * 1024 * 1024));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var uploadRes = await _httpClient.PostAsync("api/Upload", content);
+            if (uploadRes.IsSuccessStatusCode)
+            {
+                var json = await uploadRes.Content.ReadFromJsonAsync<UploadResponse>();
+                if (!string.IsNullOrEmpty(json?.url))
+                {
+                    data.pic = json.url;
+                    snackBar.Add("تصویر با موفقیت بارگذاری شد.", Severity.Success);
+                }
+            }
+            else
+            {
+                // روش جایگزین: Base64 در صورت عدم دسترسی به Upload API
+                var buf = new byte[file.Size];
+                using (var stream = file.OpenReadStream(2 * 1024 * 1024))
+                {
+                    await stream.ReadAsync(buf);
+                }
+                data.pic = $"data:{file.ContentType};base64,{Convert.ToBase64String(buf)}";
+                snackBar.Add("تصویر انتخاب شد.", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در بارگذاری تصویر: {ex.Message}", Severity.Error);
+        }
     }
 
+    private void Del_pic()
+    {
+        data.pic = null;
+        snackBar.Add("تصویر پروفایل حذف گردید.", Severity.Info);
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(data.fname))
+        {
+            snackBar.Add("نام و نام خانوادگی الزامی است.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(newPassword))
+            {
+                data.pass = newPassword.Trim();
+            }
+
+            var res = await _httpClient.PutAsJsonAsync("api/User", data);
+            if (res.IsSuccessStatusCode)
+            {
+                snackBar.Add("اطلاعات حساب کاربری با موفقیت به‌روزرسانی شد.", Severity.Success);
+                await UserProfileState.LoadUserAsync();
+                newPassword = string.Empty;
+            }
+            else
+            {
+                snackBar.Add("خطا در ذخیره اطلاعات حساب کاربری.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoToBack()
+    {
+        nav.NavigateTo("/");
+    }
+
+    private Color GetRoleColor(string? role)
+    {
+        return role switch
+        {
+            UserRoles.SystemAdmin => Color.Error,
+            UserRoles.SchoolManager => Color.Warning,
+            UserRoles.Consultant => Color.Success,
+            UserRoles.Student => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private class UploadResponse
+    {
+        public string? url { get; set; }
+        public string? fullUrl { get; set; }
+    }
 }

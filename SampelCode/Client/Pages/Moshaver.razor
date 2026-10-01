@@ -1,0 +1,390 @@
+@page "/Moshaver"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Common
+@using NovinApp.Shared.DTOs.Consultants
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject IDialogService dialogService
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.SupervisorAccount" Class="ml-2 align-middle" />
+                مدیریت و لیست مشاوران تحصیلی
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                مشاهده، جستجو، ثبت و ویرایش پرونده مشاوران و پایش تعداد دانش‌آموزان تحت نظر
+            </MudText>
+        </div>
+        @if (UserProfileState.IsSystemAdmin)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.PersonAdd"
+                       Class="text-primary font-weight-bold" OnClick="OpenCreateDialog">
+                افزودن مشاور جدید
+            </MudButton>
+        }
+    </div>
+</div>
+
+<MudPaper Elevation="0" Class="modern-card pa-4">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+        <MudTextField @bind-Value="searchString" Placeholder="جستجوی نام یا کد ملی مشاور..."
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-300" />
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
+            تعداد کل: @consultants.Count نفر
+        </MudChip>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center align-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.subtitle2" Class="ms-3">در حال بارگذاری اطلاعات مشاوران...</MudText>
+        </div>
+    }
+    else if (!FilteredConsultants.Any())
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg my-4">
+            هیچ مشاوری یافت نگردید یا با فیلتر جستجو همخوانی ندارد.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredConsultants" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>نام و نام خانوادگی</MudTh>
+                <MudTh>کد ملی</MudTh>
+                <MudTh>تلفن همراه</MudTh>
+                <MudTh>زمینه تخصص</MudTh>
+                <MudTh Class="text-center">دانش‌آموزان تحت نظر</MudTh>
+                <MudTh>وضعیت</MudTh>
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudTh Class="text-center">عملیات</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="نام و نام خانوادگی">
+                    <div class="d-flex align-center gap-2">
+                        <MudAvatar Size="Size.Small" Color="Color.Primary">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                        </MudAvatar>
+                        <span class="font-weight-bold text-primary">@context.FullName</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="کد ملی">@context.NationalCode</MudTd>
+                <MudTd DataLabel="تلفن">@(context.PhoneNumber ?? "---")</MudTd>
+                <MudTd DataLabel="تخصص">@(context.Specialty ?? "مشاور تحصیلی")</MudTd>
+                <MudTd DataLabel="دانش‌آموزان" Class="text-center">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                        @context.StudentsCount دانش‌آموز
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="وضعیت">
+                    @if (context.IsActive)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">فعال</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">غیرفعال</MudChip>
+                    }
+                </MudTd>
+                @if (UserProfileState.IsSystemAdmin)
+                {
+                    <MudTd DataLabel="عملیات" Class="text-center">
+                        <MudTooltip Text="ویرایش مشاور">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Warning" Size="Size.Small"
+                                           OnClick="@(() => OpenEditDialog(context))" />
+                        </MudTooltip>
+                        <MudTooltip Text="حذف مشاور">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => DeleteConsultant(context))" />
+                        </MudTooltip>
+                    </MudTd>
+                }
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@* دیالوگ ثبت مشاور جدید *@
+<MudDialog @bind-Visible="isCreateDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">ثبت مشاور تحصیلی جدید</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@createModel" OnValidSubmit="SaveCreateConsultant">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.FullName" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.FullName)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.NationalCode" Label="کد ملی (۱۰ رقم)" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.NationalCode)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.Password" Label="کلمه عبور" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Required="true" For="@(() => createModel.Password)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.PhoneNumber" Label="تلفن همراه" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="createModel.Specialty" Label="زمینه تخصص مشاوره" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="createModel.Bio" Label="رزومه و سوابق تحصیلی" Variant="Variant.Outlined"
+                                  Lines="2" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isCreateDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveCreateConsultant" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال ذخیره...</span>
+            }
+            else
+            {
+                <span>ثبت مشاور</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* دیالوگ ویرایش مشاور *@
+<MudDialog @bind-Visible="isEditDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">ویرایش اطلاعات مشاور</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@updateModel" OnValidSubmit="SaveUpdateConsultant">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.FullName" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => updateModel.FullName)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.PhoneNumber" Label="تلفن همراه" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.Specialty" Label="زمینه تخصص مشاوره" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="updateModel.NewPassword" Label="کلمه عبور جدید (اختیاری)" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="updateModel.Bio" Label="رزومه و سوابق تحصیلی" Variant="Variant.Outlined"
+                                  Lines="2" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="updateModel.IsActive" Label="وضعیت فعالیت" Color="Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isEditDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveUpdateConsultant" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال به‌روزرسانی...</span>
+            }
+            else
+            {
+                <span>ذخیره تغییرات</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<ConsultantDto> consultants = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isCreateDialogOpen = false;
+    private bool isEditDialogOpen = false;
+    private string searchString = "";
+
+    private CreateConsultantDto createModel = new();
+    private UpdateConsultantDto updateModel = new();
+
+    private DialogOptions dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseButton = true
+    };
+
+    private IEnumerable<ConsultantDto> FilteredConsultants =>
+        string.IsNullOrWhiteSpace(searchString)
+            ? consultants
+            : consultants.Where(c => c.FullName.Contains(searchString) ||
+                                     c.NationalCode.Contains(searchString) ||
+                                     (c.Specialty?.Contains(searchString) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConsultants();
+    }
+
+    private async Task LoadConsultants()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<ConsultantDto>>>("api/consultants");
+            if (res != null && res.Success && res.Data != null)
+            {
+                consultants = res.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در بارگذاری لیست مشاوران: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        createModel = new CreateConsultantDto();
+        isCreateDialogOpen = true;
+    }
+
+    private void OpenEditDialog(ConsultantDto consultant)
+    {
+        updateModel = new UpdateConsultantDto
+        {
+            Id = consultant.Id,
+            FullName = consultant.FullName,
+            PhoneNumber = consultant.PhoneNumber,
+            Specialty = consultant.Specialty,
+            Bio = consultant.Bio,
+            IsActive = consultant.IsActive
+        };
+        isEditDialogOpen = true;
+    }
+
+    private async Task SaveCreateConsultant()
+    {
+        if (string.IsNullOrWhiteSpace(createModel.FullName) || string.IsNullOrWhiteSpace(createModel.NationalCode) || string.IsNullOrWhiteSpace(createModel.Password))
+        {
+            snackBar.Add("لطفاً اطلاعات ضروری (نام، کد ملی، کلمه عبور) را تکمیل فرمایید.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/consultants", createModel);
+            var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<ConsultantDto>>();
+            if (apiRes?.Success == true)
+            {
+                snackBar.Add("مشاور جدید با موفقیت ثبت شد.", Severity.Success);
+                isCreateDialogOpen = false;
+                await LoadConsultants();
+            }
+            else
+            {
+                snackBar.Add(apiRes?.Message ?? "خطا در ثبت مشاور", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطای سیستمی: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveUpdateConsultant()
+    {
+        if (string.IsNullOrWhiteSpace(updateModel.FullName))
+        {
+            snackBar.Add("نام و نام خانوادگی الزامی است.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/consultants/{updateModel.Id}", updateModel);
+            var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            if (apiRes?.Success == true)
+            {
+                snackBar.Add("اطلاعات مشاور با موفقیت به‌روزرسانی شد.", Severity.Success);
+                isEditDialogOpen = false;
+                await LoadConsultants();
+            }
+            else
+            {
+                snackBar.Add(apiRes?.Message ?? "خطا در به‌روزرسانی", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطای سیستمی: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteConsultant(ConsultantDto consultant)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف مشاور «{consultant.FullName}» اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                var res = await _http.DeleteAsync($"api/consultants/{consultant.Id}");
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true)
+                {
+                    snackBar.Add("مشاور با موفقیت حذف شد.", Severity.Success);
+                    await LoadConsultants();
+                }
+                else
+                {
+                    snackBar.Add(apiRes?.Message ?? "خطا در حذف مشاور", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                snackBar.Add($"خطا در حذف مشاور: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

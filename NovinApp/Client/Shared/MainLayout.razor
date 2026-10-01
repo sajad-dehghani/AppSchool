@@ -5,12 +5,11 @@
 @inject NavigationManager Navigation
 @inject UserProfileStateService UserProfileState
 
-<MudThemeProvider Theme="@my" IsDarkMode="@isdark" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-
 <MudRTLProvider RightToLeft="true">
+    <MudThemeProvider Theme="@my" IsDarkMode="@isdark" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
 
     <MudLayout>
 
@@ -22,7 +21,7 @@
                            OnClick="ToggleDrawer"  />
 
             <MudText Typo="Typo.h6" Class="ml-2">
-                سامانه مشاورر نوین
+                سامانه مشاور نوین
             </MudText>
 
             <MudSpacer />
@@ -49,11 +48,9 @@
 
         <!-- Main Content -->
         <MudMainContent>
-            <MudContainer>
-
+            <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="my-4">
                 @Body
             </MudContainer>
-
         </MudMainContent>
 
     </MudLayout>
@@ -61,16 +58,28 @@
 </MudRTLProvider>
 
 @code {
-        bool isdark = false;
+    bool isdark = false;
     MudTheme my = new MudTheme()
     {
         PaletteLight = new PaletteLight()
         {
-            PrimaryDarken = Colors.Blue.Darken3,
-            AppbarBackground = Colors.Blue.Darken4
-          
+            Primary = "#1976D2",
+            PrimaryDarken = "#0D47A1",
+            Secondary = "#26A69A",
+            AppbarBackground = "#1565C0",
+            Background = "#F5F7FB",
+            Surface = "#FFFFFF",
+            DrawerBackground = "#FFFFFF"
         },
-
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#42A5F5",
+            Secondary = "#80CBC4",
+            Background = "#121212",
+            Surface = "#1E1E1E",
+            DrawerBackground = "#1E1E1E",
+            AppbarBackground = "#1E1E1E"
+        }
     };
     private bool _drawerOpen = true;
 

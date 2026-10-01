@@ -1,0 +1,332 @@
+@page "/Users"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component
+@using NovinApp.Shared.Constants
+@using NovinApp.Shared.DTOs.Auth
+@using NovinApp.Shared.DTOs.Common
+@inject HttpClient _http
+@inject ISnackbar snackBar
+@inject IDialogService dialogService
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize(Roles = UserRoles.SystemAdmin)]
+
+<div class="page-banner banner-primary mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Class="ml-2 align-middle" />
+                مدیریت کلیه حساب‌های کاربری و دسترسی‌ها
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                مشاهده کاربران، فیلتر بر اساس نقش، فعال‌سازی/غیرفعال‌سازی و بازنشانی دسترسی‌ها
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Surface" StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Class="text-primary font-weight-bold" OnClick="OpenCreateDialog">
+            ایجاد حساب کاربری جدید
+        </MudButton>
+    </div>
+</div>
+
+<MudPaper Elevation="0" Class="modern-card pa-4">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudTextField @bind-Value="searchString" Placeholder="جستجوی نام، کد ملی یا شماره تلفن..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-250" />
+
+            <MudSelect T="string" @bind-Value="selectedRoleFilter" Label="فیلتر بر اساس نقش" Dense="true"
+                       Margin="Margin.Dense" Variant="Variant.Outlined" Class="max-w-200" Clearable="true"
+                       SelectedValuesChanged="LoadUsers">
+                <MudSelectItem Value="@(UserRoles.SystemAdmin)">@UserRoles.SystemAdminPersian</MudSelectItem>
+                <MudSelectItem Value="@(UserRoles.SchoolManager)">@UserRoles.SchoolManagerPersian</MudSelectItem>
+                <MudSelectItem Value="@(UserRoles.Consultant)">@UserRoles.ConsultantPersian</MudSelectItem>
+                <MudSelectItem Value="@(UserRoles.Student)">@UserRoles.StudentPersian</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
+            تعداد کل: @users.Count کاربر
+        </MudChip>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-center align-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.subtitle2" Class="ms-3">در حال بارگذاری حساب‌های کاربری...</MudText>
+        </div>
+    }
+    else if (!FilteredUsers.Any())
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg my-4">
+            هیچ کاربری با مشخصات وارد شده یافت نگردید.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@FilteredUsers" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>نام و نام خانوادگی</MudTh>
+                <MudTh>نام کاربری / کد ملی</MudTh>
+                <MudTh>نقش کاربری</MudTh>
+                <MudTh>شماره تلفن</MudTh>
+                <MudTh Class="text-center">وضعیت حساب</MudTh>
+                <MudTh Class="text-center">عملیات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="نام کاربر">
+                    <div class="d-flex align-center gap-2">
+                        <MudAvatar Size="Size.Small" Color="Color.Primary">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                        </MudAvatar>
+                        <span class="font-weight-bold text-primary">@context.FullName</span>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="کد ملی">@context.NationalCode</MudTd>
+                <MudTd DataLabel="نقش">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@GetRoleBadgeColor(context.Role)">
+                        @context.RolePersian
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="تلفن">@(context.PhoneNumber ?? "---")</MudTd>
+                <MudTd DataLabel="وضعیت" Class="text-center">
+                    <MudSwitch T="bool" Value="@context.IsActive" ValueChanged="@((b) => ToggleUserStatus(context))"
+                               Color="Color.Success" />
+                </MudTd>
+                <MudTd DataLabel="عملیات" Class="text-center">
+                    @if (context.Username != "admin")
+                    {
+                        <MudTooltip Text="حذف کاربر">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => DeleteUser(context))" />
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <span class="text-muted small">مدیر سیستم اصلی</span>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@* دیالوگ ثبت کاربر جدید *@
+<MudDialog @bind-Visible="isCreateDialogOpen" Options="dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Class="font-weight-bold">ثبت کاربر جدید در سامانه</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@createModel" OnValidSubmit="SaveCreateUser">
+            <DataAnnotationsValidator />
+            <MudGrid Spacing="2" Class="pt-2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.FullName" Label="نام و نام خانوادگی" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.FullName)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.NationalCode" Label="کد ملی (۱۰ رقم)" Variant="Variant.Outlined"
+                                  Required="true" For="@(() => createModel.NationalCode)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.Password" Label="کلمه عبور" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Required="true" For="@(() => createModel.Password)" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="createModel.Role" Label="نقش کاربر" Variant="Variant.Outlined" Required="true" Margin="Margin.Dense">
+                        <MudSelectItem Value="@(UserRoles.Student)">@UserRoles.StudentPersian</MudSelectItem>
+                        <MudSelectItem Value="@(UserRoles.Consultant)">@UserRoles.ConsultantPersian</MudSelectItem>
+                        <MudSelectItem Value="@(UserRoles.SchoolManager)">@UserRoles.SchoolManagerPersian</MudSelectItem>
+                        <MudSelectItem Value="@(UserRoles.SystemAdmin)">@UserRoles.SystemAdminPersian</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="createModel.PhoneNumber" Label="تلفن همراه" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="createModel.Gender" Label="جنسیت" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("مرد")">مرد</MudSelectItem>
+                        <MudSelectItem Value="@("زن")">زن</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => isCreateDialogOpen = false)" Variant="Variant.Text">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveCreateUser" Disabled="isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                <span>در حال ایجاد...</span>
+            }
+            else
+            {
+                <span>ایجاد کاربر</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<UserProfileDto> users = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isCreateDialogOpen = false;
+    private string searchString = "";
+    private string? selectedRoleFilter = null;
+
+    private RegisterUserDto createModel = new() { Role = UserRoles.Student, Gender = "مرد" };
+
+    private DialogOptions dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseButton = true
+    };
+
+    private IEnumerable<UserProfileDto> FilteredUsers =>
+        string.IsNullOrWhiteSpace(searchString)
+            ? users
+            : users.Where(u => u.FullName.Contains(searchString) ||
+                               u.NationalCode.Contains(searchString) ||
+                               (u.PhoneNumber?.Contains(searchString) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        try
+        {
+            string url = "api/users?";
+            if (!string.IsNullOrWhiteSpace(selectedRoleFilter))
+                url += $"role={selectedRoleFilter}&";
+
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<UserProfileDto>>>(url);
+            if (res != null && res.Success && res.Data != null)
+            {
+                users = res.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا در بارگذاری کاربران: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        createModel = new RegisterUserDto { Role = UserRoles.Student, Gender = "مرد" };
+        isCreateDialogOpen = true;
+    }
+
+    private async Task SaveCreateUser()
+    {
+        if (string.IsNullOrWhiteSpace(createModel.FullName) || string.IsNullOrWhiteSpace(createModel.NationalCode) || string.IsNullOrWhiteSpace(createModel.Password))
+        {
+            snackBar.Add("لطفاً اطلاعات ضروری را تکمیل فرمایید.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/users", createModel);
+            var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<UserProfileDto>>();
+            if (apiRes?.Success == true)
+            {
+                snackBar.Add("کاربر با موفقیت ایجاد شد.", Severity.Success);
+                isCreateDialogOpen = false;
+                await LoadUsers();
+            }
+            else
+            {
+                snackBar.Add(apiRes?.Message ?? "خطا در ایجاد کاربر", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطای سیستمی: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleUserStatus(UserProfileDto user)
+    {
+        try
+        {
+            var res = await _http.PutAsync($"api/users/{user.Id}/toggle-status", null);
+            var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            if (apiRes?.Success == true)
+            {
+                user.IsActive = apiRes.Data;
+                snackBar.Add(apiRes.Message, Severity.Info);
+            }
+            else
+            {
+                snackBar.Add("خطا در تغییر وضعیت کاربر.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            snackBar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteUser(UserProfileDto user)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("mytext", $"آیا از حذف حساب کاربری «{user.FullName}» اطمینان دارید؟");
+        var dialog = await dialogService.ShowAsync<Alert_qoustion>("", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                var res = await _http.DeleteAsync($"api/users/{user.Id}");
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true)
+                {
+                    snackBar.Add("کاربر با موفقیت حذف شد.", Severity.Success);
+                    await LoadUsers();
+                }
+                else
+                {
+                    snackBar.Add(apiRes?.Message ?? "خطا در حذف کاربر", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                snackBar.Add($"خطا در حذف: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetRoleBadgeColor(string role)
+    {
+        return role switch
+        {
+            UserRoles.SystemAdmin => Color.Error,
+            UserRoles.SchoolManager => Color.Warning,
+            UserRoles.Consultant => Color.Info,
+            UserRoles.Student => Color.Success,
+            _ => Color.Default
+        };
+    }
+}

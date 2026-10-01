@@ -1,0 +1,142 @@
+@page "/CounselorReports"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Shared
+@inject PsychologyTestService testService
+@inject UserProfileStateService UserProfileState
+@inject NavigationManager nav
+@inject HttpClient _http
+@attribute [Authorize]
+
+<MudPaper Elevation="3" Class="pa-4 mb-4" Style="border-radius: 12px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: white;">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.AssignmentInd" Class="ml-2 align-middle" />
+                کارتابل ارزیابی روانشناسی دانش‌آموزان (ویژه مشاور)
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-1" Style="opacity: 0.9;">
+                مشاهده کارنامه‌های آزمون‌های روانشناسی، هدایت تحصیلی و تحلیل‌های هوش مصنوعی دانش‌آموزان
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Surface" StartIcon="@Icons.Material.Filled.ArrowForward" Href="/Products">
+            بازگشت به آزمون‌ها
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center my-12">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        <MudText Typo="Typo.subtitle1" Class="ms-3">در حال فراخوانی پرونده‌های آزمون دانش‌آموزان...</MudText>
+    </div>
+}
+else if (!testResults.Any())
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="rounded-lg">
+        تاکنون آزمونی توسط دانش‌آموزان ثبت نگردیده است. به محض تکمیل آزمون توسط هر دانش‌آموز، کارنامه و تحلیل هوش مصنوعی آن در این بخش نمایش داده خواهد شد.
+    </MudAlert>
+}
+else
+{
+    <MudCard Elevation="4" Class="rounded-lg">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">لیست کارنامه‌های ثبت شده (@testResults.Count کارنامه)</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudTextField @bind-Value="searchString" Placeholder="جستجوی نام یا کدملی دانش‌آموز..."
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium" Class="mt-0" Immediate="true" />
+            </CardHeaderActions>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudTable Items="@FilteredResults" Hover="true" Striped="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>نام دانش‌آموز</MudTh>
+                    <MudTh>کد ملی</MudTh>
+                    <MudTh>عنوان آزمون</MudTh>
+                    <MudTh>شاخص برتر</MudTh>
+                    <MudTh>تاریخ آزمون</MudTh>
+                    <MudTh>نظریه هوش مصنوعی</MudTh>
+                    <MudTh Class="text-center">عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="نام دانش‌آموز"><strong>@context.StudentName</strong></MudTd>
+                    <MudTd DataLabel="کد ملی">@context.StudentNationalCode</MudTd>
+                    <MudTd DataLabel="عنوان آزمون">
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">
+                            @context.TestTitle
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="شاخص برتر">
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                            @context.PrimaryScore
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="تاریخ آزمون">@context.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudTd>
+                    <MudTd DataLabel="هوش مصنوعی">
+                        @if (context.IsAiGenerated || !string.IsNullOrEmpty(context.AiRecommendation))
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.Check">تحلیل شده</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small">ثبت اولیه</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd Class="text-center">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Visibility"
+                                   Href="@($"/Quiz/{context.TestType}?studentId={context.UserId}")">
+                            مشاهده کارنامه و پرینت
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="تعداد در هر صفحه:" />
+                </PagerContent>
+            </MudTable>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private bool isLoading = true;
+    private List<PsychologyTestResult> testResults = new();
+    private string searchString = "";
+
+    private IEnumerable<PsychologyTestResult> FilteredResults =>
+        string.IsNullOrWhiteSpace(searchString)
+            ? testResults
+            : testResults.Where(r => r.StudentName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                                     r.StudentNationalCode.Contains(searchString) ||
+                                     r.TestTitle.Contains(searchString, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserProfileState.IsLoaded)
+            await UserProfileState.LoadUserAsync();
+
+        var user = UserProfileState.CurrentUser;
+        if (user != null)
+        {
+            // اگر مشاور باشد، کارنامه‌های دانش‌آموزان تحت نظرش؛ اگر مدیر باشد، همه کارنامه‌ها
+            testResults = await testService.GetCounselorStudentsTestsAsync(user.Id);
+
+            // اگر به عنوان مدیر وارد شده و تستی پیدا نشد، دریافت تمام نتایج
+            if (!testResults.Any() && (user.Rool?.Contains("مدیر") == true || user.Rool?.Contains("مشاور") == true))
+            {
+                try
+                {
+                    testResults = await _http.GetFromJsonAsync<List<PsychologyTestResult>>("api/PsychologyTest/counselor-students/0") ?? new();
+                }
+                catch { }
+            }
+        }
+
+        isLoading = false;
+    }
+}
