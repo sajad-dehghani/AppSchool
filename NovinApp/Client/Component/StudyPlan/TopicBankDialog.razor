@@ -1,0 +1,233 @@
+@using NovinApp.Shared.DTOs.Common
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+            <div>
+                <MudText Typo="Typo.h6" Class="font-weight-bold text-primary">
+                    <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Class="ml-2 align-middle" />
+                    مدیریت بانک سرفصل‌ها و مباحث دروس
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    مباحث تعریف شده در این بخش در فرم‌های برنامه‌ریزی به صورت خودکار قابل انتخاب و جستجو خواهند بود.
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => isAddingNew = !isAddingNew)">
+                @(isAddingNew ? "بستن فرم ثبت" : "+ افزودن مبحث جدید")
+            </MudButton>
+        </div>
+
+        @* فرم افزودن مبحث جدید *@
+        @if (isAddingNew)
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4 rounded-lg" Style="border: 2px dashed var(--mud-palette-primary);">
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-3 text-primary">
+                    <MudIcon Icon="@Icons.Material.Filled.AddCircle" Class="ml-1 align-middle" />
+                    مشخصات مبحث جدید
+                </MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="3">
+                        <MudSelect T="string" Label="پایه تحصیلی *" @bind-Value="newTopic.GradeLevel" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var g in GradeLevels.All)
+                            {
+                                <MudSelectItem Value="@g">@g</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudSelect T="string" Label="رشته تحصیلی *" @bind-Value="newTopic.FieldOfStudy" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var f in FieldsOfStudy.All)
+                            {
+                                <MudSelectItem Value="@f">@f</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudTextField T="string" Label="نام درس *" @bind-Value="newTopic.Subject" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="مثلاً زیست‌شناسی یا فیزیک" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudTextField T="string" Label="نام فصل *" @bind-Value="newTopic.Chapter" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="مثلاً فصل ۱: تنفس" />
+                    </MudItem>
+                    <MudItem xs="12" sm="8">
+                        <MudTextField T="string" Label="عنوان مبحث *" @bind-Value="newTopic.Topic" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="مثلاً ساختار شش‌ها و مکانیک تنفس" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4" Class="d-flex align-center justify-end">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                                   OnClick="SaveNewTopic" Disabled="isSaving" FullWidth="true">
+                            @(isSaving ? "در حال ثبت..." : "ذخیره مبحث")
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        @* فیلترها و جستجو *@
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <MudTextField @bind-Value="searchString" Placeholder="جستجو در مبحث، فصل یا درس..." Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true"
+                          Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:240px" />
+
+            <MudSelect T="string" @bind-Value="gradeFilter" Label="پایه" Margin="Margin.Dense"
+                       Variant="Variant.Outlined" Style="min-width:130px" Clearable="true">
+                @foreach (var g in GradeLevels.All)
+                {
+                    <MudSelectItem Value="@g">@g</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="string" @bind-Value="fieldFilter" Label="رشته" Margin="Margin.Dense"
+                       Variant="Variant.Outlined" Style="min-width:130px" Clearable="true">
+                @foreach (var f in FieldsOfStudy.All)
+                {
+                    <MudSelectItem Value="@f">@f</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center my-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@FilteredTopics" Hover="true" Striped="true" Dense="true" Elevation="0" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>پایه</MudTh>
+                    <MudTh>رشته</MudTh>
+                    <MudTh>نام درس</MudTh>
+                    <MudTh>فصل</MudTh>
+                    <MudTh>مبحث</MudTh>
+                    <MudTh Style="width:70px">عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="پایه">@context.GradeLevel</MudTd>
+                    <MudTd DataLabel="رشته">@context.FieldOfStudy</MudTd>
+                    <MudTd DataLabel="درس"><span class="font-weight-bold text-primary">@context.Subject</span></MudTd>
+                    <MudTd DataLabel="فصل">@context.Chapter</MudTd>
+                    <MudTd DataLabel="مبحث">@context.Topic</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteTopic(context.Id))" Title="حذف مبحث" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" />
+                </PagerContent>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Filled" Color="Color.Default">بستن</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private List<StudySubjectTopicDto> topics = new();
+    private bool isLoading = true;
+    private bool isAddingNew = false;
+    private bool isSaving = false;
+
+    private string searchString = "";
+    private string gradeFilter = "";
+    private string fieldFilter = "";
+
+    private StudySubjectTopicDto newTopic = new()
+    {
+        GradeLevel = "دوازدهم",
+        FieldOfStudy = "تجربی",
+        Subject = "زیست‌شناسی",
+        Chapter = "فصل اول",
+        Topic = ""
+    };
+
+    private IEnumerable<StudySubjectTopicDto> FilteredTopics => topics.Where(t =>
+        (string.IsNullOrEmpty(gradeFilter) || t.GradeLevel == gradeFilter) &&
+        (string.IsNullOrEmpty(fieldFilter) || t.FieldOfStudy == fieldFilter) &&
+        (string.IsNullOrWhiteSpace(searchString) ||
+         t.Topic.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         t.Chapter.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         t.Subject.Contains(searchString, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTopics();
+    }
+
+    private async Task LoadTopics()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<StudySubjectTopicDto>>>("api/studyplans/topics");
+            if (res?.Success == true && res.Data != null)
+                topics = res.Data;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا در دریافت مباحث: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveNewTopic()
+    {
+        if (string.IsNullOrWhiteSpace(newTopic.Subject) || string.IsNullOrWhiteSpace(newTopic.Topic))
+        {
+            Snackbar.Add("نام درس و عنوان مبحث الزامی است.", Severity.Warning);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/studyplans/topics", newTopic);
+            if (res.IsSuccessStatusCode)
+            {
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<StudySubjectTopicDto>>();
+                if (apiRes?.Success == true)
+                {
+                    Snackbar.Add("مبحث جدید با موفقیت اضافه شد.", Severity.Success);
+                    newTopic.Topic = "";
+                    isAddingNew = false;
+                    await LoadTopics();
+                    return;
+                }
+                Snackbar.Add(apiRes?.Message ?? "خطا در ثبت", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteTopic(int id)
+    {
+        try
+        {
+            var res = await Http.DeleteAsync($"api/studyplans/topics/{id}");
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("مبحث حذف شد.", Severity.Info);
+                await LoadTopics();
+            }
+        }
+        catch { }
+    }
+
+    private void Close() => MudDialog.Close();
+}

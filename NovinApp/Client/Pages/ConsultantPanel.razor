@@ -8,6 +8,7 @@
 @using NovinApp.Shared.DTOs.Consultants
 @inject HttpClient _http
 @inject ISnackbar snackBar
+@inject NavigationManager nav
 @inject UserProfileStateService UserProfileState
 @attribute [Authorize(Roles = UserRoles.Consultant)]
 
@@ -19,10 +20,14 @@
                 پنل مشاور - @(UserProfileState.CurrentUser?.fname ?? "مشاور گرامی")
             </MudText>
             <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity:0.9;">
-                مشاهده و مدیریت دانش‌آموزان تحت نظر
+                مشاهده و مدیریت دانش‌آموزان تحت نظر، تنظیم برنامه‌های درسی و اوقات مشاوره
             </MudText>
         </div>
         <div class="d-flex align-center gap-2 flex-wrap">
+            <MudButton Variant="Variant.Filled" Color="Color.Surface" Class="font-weight-bold text-success"
+                       StartIcon="@Icons.Material.Filled.CalendarMonth" Href="/StudyPlan">
+                تقویم و برنامه‌ریزی تحصیلی
+            </MudButton>
             <MudChip T="string" Color="Color.Surface" Variant="Variant.Filled" Size="Size.Large" Class="font-weight-bold">
                 @students.Count دانش‌آموز تحت نظر
             </MudChip>
@@ -31,6 +36,54 @@
         </div>
     </div>
 </div>
+
+@* کارت‌های دسترسی سریع مشاور *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="3" Class="pa-4 rounded-lg cursor-pointer action-card" Style="border-right: 5px solid #2E7D32;"
+                  @onclick="@(() => nav.NavigateTo("/StudyPlan"))">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-success">تقویم جامع برنامه‌ریزی</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تنظیم برنامه درسی، تست و جلسات مشاوره</MudText>
+                </div>
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" />
+                </MudAvatar>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="3" Class="pa-4 rounded-lg cursor-pointer action-card" Style="border-right: 5px solid #1976D2;"
+                  @onclick="@(() => nav.NavigateTo("/CounselorReports"))">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-primary">کارتابل ارزیابی مشاور</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">مشاهده کارنامه‌ها و گزارش‌های تحلیلی</MudText>
+                </div>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.AssignmentInd" />
+                </MudAvatar>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="3" Class="pa-4 rounded-lg cursor-pointer action-card" Style="border-right: 5px solid #7B1FA2;"
+                  @onclick="@(() => nav.NavigateTo("/StudyPlan"))">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold text-secondary">جلسات مشاوره آنلاین / حضوری</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">پاسخ به درخواست‌های مشاوره دانش‌آموزان</MudText>
+                </div>
+                <MudAvatar Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.EventAvailable" />
+                </MudAvatar>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
 @if (myProfile != null)
 {
@@ -110,6 +163,7 @@
                 <MudTh>مدرسه</MudTh>
                 <MudTh>تلفن</MudTh>
                 <MudTh>وضعیت</MudTh>
+                <MudTh Style="width: 130px; text-align: center;">عملیات</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="نام دانش‌آموز">
@@ -145,6 +199,14 @@
                         <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">غیرفعال</MudChip>
                     }
                 </MudTd>
+                <MudTd DataLabel="عملیات" Style="text-align: center;">
+                    <MudTooltip Text="مشاهده و تنظیم تقویم برنامه‌ریزی این دانش‌آموز">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CalendarMonth" Href="/StudyPlan">
+                            برنامه‌ریزی
+                        </MudButton>
+                    </MudTooltip>
+                </MudTd>
             </RowTemplate>
             <PagerContent>
                 <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" />
@@ -156,6 +218,10 @@
 <style>
     .page-banner { border-radius: 16px; padding: 20px 24px; }
     .banner-green { background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #43A047 100%); }
+    .action-card:hover {
+        transform: translateY(-2px);
+        transition: transform 0.2s ease;
+    }
 </style>
 
 @code {

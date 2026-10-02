@@ -11,14 +11,19 @@ namespace NovinApp.Server.MyContext
 
         public MyAppContext(DbContextOptions<MyAppContext> options) : base(options) { }
 
-        // ===  جداول اصلی کاربران (موجود) ===
+        // ===  جداول اصلی کاربران ===
         public DbSet<User> User { get; set; }
         public DbSet<Report_students> Report_students { get; set; }
 
-        // === جداول جدید سیستم مدیریت ===
+        // === جداول سیستم مدیریت مدارس و مشاوران ===
         public DbSet<School> Schools => Set<School>();
         public DbSet<ConsultantProfile> ConsultantProfiles => Set<ConsultantProfile>();
         public DbSet<StudentProfile> StudentProfiles => Set<StudentProfile>();
+
+        // === جداول سامانه برنامه‌ریزی و مشاوره تحصیلی ===
+        public DbSet<StudyPlanItem> StudyPlanItems => Set<StudyPlanItem>();
+        public DbSet<StudySubjectTopic> StudySubjectTopics => Set<StudySubjectTopic>();
+        public DbSet<CounselingRequest> CounselingRequests => Set<CounselingRequest>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -48,6 +53,31 @@ namespace NovinApp.Server.MyContext
 
             builder.Entity<School>()
                 .HasIndex(s => s.Name);
+
+            builder.Entity<StudyPlanItem>(b =>
+            {
+                b.HasIndex(p => p.StudentUserId);
+                b.HasIndex(p => p.ConsultantUserId);
+                b.HasIndex(p => p.PersianDate);
+                b.HasIndex(p => p.GregorianDate);
+                b.HasIndex(p => p.ActivityType);
+                b.HasIndex(p => p.Status);
+            });
+
+            builder.Entity<StudySubjectTopic>(b =>
+            {
+                b.HasIndex(t => t.GradeLevel);
+                b.HasIndex(t => t.FieldOfStudy);
+                b.HasIndex(t => t.Subject);
+                b.HasIndex(t => t.IsActive);
+            });
+
+            builder.Entity<CounselingRequest>(b =>
+            {
+                b.HasIndex(r => r.StudentUserId);
+                b.HasIndex(r => r.ConsultantUserId);
+                b.HasIndex(r => r.Status);
+            });
         }
     }
 }

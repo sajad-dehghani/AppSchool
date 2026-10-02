@@ -16,5 +16,11 @@ namespace NovinApp.Shared.DTOs.Common
 
         public static ApiResponse<T> Fail(string message, object? errors = null) =>
             new() { Success = false, Message = message, Errors = errors };
+
+        public static ApiResponse<T> SuccessResult(T? data = default, string message = "") =>
+            new() { Success = true, Data = data, Message = message };
+
+        public static ApiResponse<T> FailureResult(string message, object? errors = null) =>
+            new() { Success = false, Message = message, Errors = errors };
     }
 }

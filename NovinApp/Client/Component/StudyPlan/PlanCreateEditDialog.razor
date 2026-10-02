@@ -1,0 +1,433 @@
+@using NovinApp.Shared.DTOs.Students
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            <MudText Typo="Typo.h6" Class="font-weight-bold mb-3 text-primary">
+                <MudIcon Icon="@(Model.Id > 0 ? Icons.Material.Filled.EditCalendar : Icons.Material.Filled.AddCircleOutline)" Class="ml-2 align-middle" />
+                @(Model.Id > 0 ? "ویرایش برنامه مطالعاتی / مشاوره" : "ثبت برنامه مطالعاتی یا جلسه مشاوره جدید")
+            </MudText>
+            <MudDivider Class="mb-4" />
+
+            <MudGrid Spacing="2">
+                @* انتخاب دانش‌آموز *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="دانش‌آموز هدف *" @bind-Value="Model.StudentUserId"
+                               Variant="Variant.Outlined" Required="true" RequiredError="انتخاب دانش‌آموز الزامی است"
+                               AnchorOrigin="Origin.BottomCenter" Margin="Margin.Dense">
+                        @foreach (var st in studentList)
+                        {
+                            <MudSelectItem Value="@st.UserId">@st.FullName (@(st.GradeLevel ?? "نامشخص") - @(st.FieldOfStudy ?? ""))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* نوع فعالیت *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="نوع فعالیت *" @bind-Value="Model.ActivityType"
+                               Variant="Variant.Outlined" Required="true" RequiredError="نوع فعالیت الزامی است"
+                               AnchorOrigin="Origin.BottomCenter" Margin="Margin.Dense" SelectedValuesChanged="OnActivityTypeChanged">
+                        @foreach (var act in ActivityTypes.All)
+                        {
+                            <MudSelectItem Value="@act">@act</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* تاریخ شمسی *@
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="تاریخ شمسی *" @bind-Date="selectedDate"
+                                   Variant="Variant.Outlined" Culture="@PersianDateHelper.GetPersianCulture()"
+                                   TitleDateFormat="dddd, dd MMMM yyyy" Margin="Margin.Dense"
+                                   Required="true" />
+                </MudItem>
+
+                @* ساعت شروع *@
+                <MudItem xs="12" sm="4">
+                    <MudTimePicker Label="ساعت شروع *" @bind-Time="selectedTime"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                </MudItem>
+
+                @* مدت زمان به دقیقه *@
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int" Label="مدت زمان (دقیقه) *" @bind-Value="Model.DurationMinutes"
+                                     Variant="Variant.Outlined" Min="5" Max="720" Step="15" Margin="Margin.Dense"
+                                     HelperText="مثلاً ۶۰ یا ۹۰ دقیقه" />
+                </MudItem>
+
+                @* بخش مربوط به درس و مباحث *@
+                @if (Model.ActivityType != ActivityTypes.InPersonCounseling && Model.ActivityType != ActivityTypes.OnlineCounseling)
+                {
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="string" Label="پایه تحصیلی" @bind-Value="Model.GradeLevel"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                                   SelectedValuesChanged="OnFiltersChanged">
+                            @foreach (var g in GradeLevels.All)
+                            {
+                                <MudSelectItem Value="@g">@g</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="string" Label="رشته تحصیلی" @bind-Value="Model.FieldOfStudy"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                                   SelectedValuesChanged="OnFiltersChanged">
+                            @foreach (var f in FieldsOfStudy.All)
+                            {
+                                <MudSelectItem Value="@f">@f</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudAutocomplete T="string" Label="نام درس *" @bind-Value="Model.Subject"
+                                         SearchFunc="SearchSubjects" CoerceText="true" CoerceValue="true"
+                                         ResetValueOnEmptyText="false" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                         Required="true" RequiredError="نام درس الزامی است" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="فصل / بخش" @bind-Value="Model.Chapter"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="مثلاً فصل دوم: گوارش و جذب مواد" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudAutocomplete T="string" Label="مبحث (انتخاب یا تایپ دستی)" @bind-Value="Model.Topic"
+                                         SearchFunc="SearchTopics" CoerceText="true" CoerceValue="true"
+                                         ResetValueOnEmptyText="false" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                         Placeholder="جستجو در بانک مباحث یا تایپ مبحث دلخواه..."
+                                         AdornmentIcon="@Icons.Material.Filled.Search" Adornment="Adornment.End" />
+                    </MudItem>
+
+                    @* فیلدهای تست در صورت تست بودن فعالیت *@
+                    @if (Model.ActivityType == ActivityTypes.Test || (Model.TestCount.HasValue && Model.TestCount > 0))
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="int?" Label="تعداد تست هدف" @bind-Value="Model.TestCount"
+                                             Variant="Variant.Outlined" Min="0" Max="500" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" Label="نوع تست" @bind-Value="Model.TestType"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                @foreach (var tt in TestTypes.All)
+                                {
+                                    <MudSelectItem Value="@tt">@tt</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                }
+                else
+                {
+                    @* فیلدهای مخصوص جلسه مشاوره *@
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            تنظیم وقت جلسه مشاوره (@Model.ActivityType) برای دانش‌آموز
+                        </MudAlert>
+                    </MudItem>
+
+                    @if (Model.ActivityType == ActivityTypes.OnlineCounseling)
+                    {
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="لینک جلسه آنلاین (Skyroom, Google Meet, Adobe Connect و ...)"
+                                          @bind-Value="Model.MeetingLink" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          Placeholder="https://skyroom.online/ch/..." Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Link" />
+                        </MudItem>
+                    }
+                }
+
+                @* توضیحات مشاور *@
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="توضیحات و راهنمایی‌های مشاور برای این برنامه" @bind-Value="Model.ConsultantNote"
+                                  Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                                  Placeholder="نکات مطالعاتی، نحوه خلاصه‌نویسی، زمان مرور یا پیام برای دانش‌آموز..." />
+                </MudItem>
+
+                @* پیوست فایل مشاور *@
+                <MudItem xs="12">
+                    <div class="d-flex align-center gap-3 flex-wrap pa-2 rounded-lg" style="background-color: var(--mud-palette-background-grey); border: 1px dashed var(--mud-palette-lines-default);">
+                        <MudFileUpload T="IBrowserFile" FilesChanged="UploadConsultantFile" Accept=".pdf,.jpg,.jpeg,.png,.docx,.zip">
+                            <ActivatorContent>
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.AttachFile"
+                                           Disabled="isUploading">
+                                    @(isUploading ? "در حال آپلود..." : "پیوست فایل / جزوه / سوالات (مشاور)")
+                                </MudButton>
+                            </ActivatorContent>
+                        </MudFileUpload>
+
+                        @if (!string.IsNullOrEmpty(Model.ConsultantAttachmentUrl))
+                        {
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" OnClose="RemoveAttachment">
+                                    @(Model.ConsultantAttachmentName ?? "فایل پیوست شده")
+                                </MudChip>
+                                <MudLink Href="@Model.ConsultantAttachmentUrl" Target="_blank">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" Color="Color.Primary" />
+                                </MudLink>
+                            </div>
+                        }
+                    </div>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Color="Color.Default">انصراف</MudButton>
+        <MudButton OnClick="SavePlan" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="isSaving || isUploading">
+            @(isSaving ? "در حال ذخیره..." : "ثبت و تایید برنامه")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public StudyPlanCreateUpdateDto Model { get; set; } = new();
+    [Parameter] public int? PreselectedStudentUserId { get; set; }
+    [Parameter] public string? PreselectedPersianDate { get; set; }
+
+    private MudForm form = null!;
+    private bool isValid;
+    private bool isSaving;
+    private bool isUploading;
+
+    private DateTime? selectedDate = DateTime.Now;
+    private TimeSpan? selectedTime = new TimeSpan(8, 0, 0);
+
+    private List<StudentDto> studentList = new();
+    private List<StudySubjectTopicDto> allTopics = new();
+
+    private readonly string[] defaultSubjectList = new[]
+    {
+        "زیست‌شناسی", "شیمی", "فیزیک", "ریاضیات", "حسابان", "هندسه", "گسسته و آمار",
+        "ادبیات فارسی", "عربی تخصصی", "عربی عمومی", "زبان انگلیسی", "دین و زندگی",
+        "فلسفه و منطق", "روانشناسی", "جامعه‌شناسی", "اقتصاد", "علوم و فنون ادبی",
+        "تاریخ", "جغرافیا", "زمین‌شناسی"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStudents();
+        await LoadTopics();
+
+        if (Model.Id > 0)
+        {
+            if (!string.IsNullOrEmpty(Model.PersianDate) && PersianDateHelper.TryParsePersianDate(Model.PersianDate, out var dt))
+                selectedDate = dt;
+
+            if (!string.IsNullOrEmpty(Model.StartTime) && TimeSpan.TryParse(Model.StartTime, out var ts))
+                selectedTime = ts;
+        }
+        else
+        {
+            if (PreselectedStudentUserId.HasValue && PreselectedStudentUserId.Value > 0)
+                Model.StudentUserId = PreselectedStudentUserId.Value;
+            else if (studentList.Any())
+                Model.StudentUserId = studentList.First().UserId;
+
+            if (!string.IsNullOrEmpty(PreselectedPersianDate) && PersianDateHelper.TryParsePersianDate(PreselectedPersianDate, out var pdt))
+            {
+                selectedDate = pdt;
+                Model.PersianDate = PreselectedPersianDate;
+            }
+            else
+            {
+                selectedDate = DateTime.Now;
+                Model.PersianDate = PersianDateHelper.NowPersianDate();
+            }
+
+            Model.StartTime = "08:00";
+            selectedTime = new TimeSpan(8, 0, 0);
+            Model.DurationMinutes = 60;
+        }
+    }
+
+    private async Task LoadStudents()
+    {
+        try
+        {
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<StudentDto>>>("api/students");
+            if (res?.Success == true && res.Data != null)
+                studentList = res.Data;
+        }
+        catch { }
+    }
+
+    private async Task LoadTopics()
+    {
+        try
+        {
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<StudySubjectTopicDto>>>("api/studyplans/topics");
+            if (res?.Success == true && res.Data != null)
+                allTopics = res.Data;
+        }
+        catch { }
+    }
+
+    private void OnActivityTypeChanged()
+    {
+        if (Model.ActivityType == ActivityTypes.Test && (!Model.TestCount.HasValue || Model.TestCount == 0))
+        {
+            Model.TestCount = 30;
+            Model.TestType = TestTypes.Educational;
+        }
+        else if (Model.ActivityType == ActivityTypes.InPersonCounseling || Model.ActivityType == ActivityTypes.OnlineCounseling)
+        {
+            Model.IsCounselingSession = true;
+            Model.Subject = "جلسه مشاوره تحصیلی";
+            Model.DurationMinutes = 45;
+        }
+    }
+
+    private void OnFiltersChanged()
+    {
+        StateHasChanged();
+    }
+
+    private Task<IEnumerable<string>> SearchSubjects(string value, CancellationToken token)
+    {
+        var topicsSubjects = allTopics.Select(t => t.Subject).Distinct();
+        var combined = defaultSubjectList.Union(topicsSubjects);
+
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult(combined);
+
+        return Task.FromResult(combined.Where(x => x.Contains(value, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private Task<IEnumerable<string>> SearchTopics(string value, CancellationToken token)
+    {
+        var query = allTopics.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(Model.GradeLevel))
+            query = query.Where(t => t.GradeLevel == Model.GradeLevel);
+
+        if (!string.IsNullOrEmpty(Model.FieldOfStudy))
+            query = query.Where(t => t.FieldOfStudy == Model.FieldOfStudy || t.FieldOfStudy == "عمومی");
+
+        if (!string.IsNullOrEmpty(Model.Subject))
+            query = query.Where(t => t.Subject.Contains(Model.Subject, StringComparison.OrdinalIgnoreCase));
+
+        var list = query.Select(t => t.Topic).Distinct();
+
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult(list);
+
+        return Task.FromResult(list.Where(x => x.Contains(value, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private async Task UploadConsultantFile(IBrowserFile file)
+    {
+        if (file == null) return;
+        if (file.Size > 25 * 1024 * 1024)
+        {
+            Snackbar.Add("حداکثر حجم فایل مجاز ۲۵ مگابایت است.", Severity.Warning);
+            return;
+        }
+
+        isUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024));
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await Http.PostAsync("api/upload", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResponse>();
+                if (result != null && !string.IsNullOrEmpty(result.url))
+                {
+                    Model.ConsultantAttachmentUrl = result.url;
+                    Model.ConsultantAttachmentName = file.Name;
+                    Snackbar.Add("فایل با موفقیت پیوست شد.", Severity.Success);
+                }
+            }
+            else
+            {
+                Snackbar.Add("خطا در آپلود فایل", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا در آپلود: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void RemoveAttachment()
+    {
+        Model.ConsultantAttachmentUrl = null;
+        Model.ConsultantAttachmentName = null;
+    }
+
+    private async Task SavePlan()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        if (Model.StudentUserId <= 0)
+        {
+            Snackbar.Add("لطفاً دانش‌آموز را انتخاب کنید.", Severity.Warning);
+            return;
+        }
+
+        if (selectedDate.HasValue)
+            Model.PersianDate = PersianDateHelper.ToPersianDateString(selectedDate.Value);
+
+        if (selectedTime.HasValue)
+            Model.StartTime = $"{selectedTime.Value.Hours:00}:{selectedTime.Value.Minutes:00}";
+
+        isSaving = true;
+        try
+        {
+            HttpResponseMessage res;
+            if (Model.Id > 0)
+                res = await Http.PutAsJsonAsync($"api/studyplans/{Model.Id}", Model);
+            else
+                res = await Http.PostAsJsonAsync("api/studyplans", Model);
+
+            if (res.IsSuccessStatusCode)
+            {
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<StudyPlanItemDto>>();
+                if (apiRes?.Success == true)
+                {
+                    Snackbar.Add(Model.Id > 0 ? "برنامه با موفقیت ویرایش شد." : "برنامه با موفقیت ثبت گردید.", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                    return;
+                }
+                Snackbar.Add(apiRes?.Message ?? "خطا در پردازش سرور", Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add("خطا در ارتباط با سرور", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class UploadResponse
+    {
+        public string url { get; set; } = string.Empty;
+        public string fullUrl { get; set; } = string.Empty;
+    }
+}

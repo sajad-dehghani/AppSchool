@@ -1,0 +1,322 @@
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            @* کارت خلاصه برنامه تعیین شده توسط مشاور *@
+            <MudPaper Elevation="0" Class="pa-3 mb-4 rounded-lg" Style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white;">
+                <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                    <div>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">
+                            <MudIcon Icon="@Icons.Material.Filled.Assignment" Class="ml-2 align-middle" />
+                            @Plan.Subject - @(Plan.Topic ?? Plan.Chapter ?? "مبحث مشخص")
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="opacity: 0.9;" Class="mt-1">
+                            تاریخ: @Plan.PersianDate | ساعت: @Plan.StartTime | مدت هدف: @Plan.DurationMinutes دقیقه | نوع: @Plan.ActivityType
+                            @if (Plan.TestCount.HasValue && Plan.TestCount > 0)
+                            {
+                                <span> | هدف تست: @Plan.TestCount (@Plan.TestType)</span>
+                            }
+                        </MudText>
+                    </div>
+                    <MudChip T="string" Color="Color.Surface" Variant="Variant.Filled" Class="font-weight-bold text-primary">
+                        مشاور: @(Plan.ConsultantName ?? "مشاور شما")
+                    </MudChip>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Plan.ConsultantNote))
+                {
+                    <div class="mt-2 pa-2 rounded" style="background-color: rgba(255,255,255,0.15); font-size: 13px;">
+                        <strong><MudIcon Icon="@Icons.Material.Filled.TipsAndUpdates" Size="Size.Small" Class="ml-1 align-middle" /> راهنمایی مشاور:</strong> @Plan.ConsultantNote
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Plan.ConsultantAttachmentUrl))
+                {
+                    <div class="mt-2 d-flex align-center gap-2">
+                        <MudText Typo="Typo.caption">فایل پیوست مشاور:</MudText>
+                        <MudButton Href="@Plan.ConsultantAttachmentUrl" Target="_blank" Variant="Variant.Filled"
+                                   Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download">
+                            دریافت فایل پیوست مشاور
+                        </MudButton>
+                    </div>
+                }
+            </MudPaper>
+
+            <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3 text-secondary">
+                <MudIcon Icon="@Icons.Material.Filled.FactCheck" Class="ml-2 align-middle" />
+                ثبت بازخورد و گزارش عملکرد مطالعه شما
+            </MudText>
+            <MudDivider Class="mb-3" />
+
+            <MudGrid Spacing="2">
+                @* وضعیت انجام *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="وضعیت اجرای برنامه *" @bind-Value="Model.StudentStatus"
+                               Variant="Variant.Outlined" Required="true" RequiredError="انتخاب وضعیت الزامی است"
+                               Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter" SelectedValuesChanged="OnStatusChanged">
+                        <MudSelectItem Value="@("انجام کامل")">✅ انجام کامل و دقیق</MudSelectItem>
+                        <MudSelectItem Value="@("ناقص")">⚠️ انجام ناقص / بخشی از مبحث</MudSelectItem>
+                        <MudSelectItem Value="@("انجام نشد")">❌ انجام نشد</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @* درصد مطالعه *@
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" Label="درصد پیشرفت و مطالعه *" @bind-Value="Model.StudyPercentage"
+                                     Variant="Variant.Outlined" Min="0" Max="100" Step="5" Margin="Margin.Dense"
+                                     HelperText="از ۰ تا ۱۰۰ درصد" Adornment="Adornment.End" AdornmentText="%" />
+                </MudItem>
+
+                @* مدت زمان واقعی مطالعه به دقیقه *@
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" Label="مدت زمان واقعی مطالعه (دقیقه) *" @bind-Value="Model.ActualDurationMinutes"
+                                     Variant="Variant.Outlined" Min="0" Max="720" Step="15" Margin="Margin.Dense"
+                                     HelperText="مثلاً ۶۰ دقیقه" />
+                </MudItem>
+
+                @* کیفیت مطالعه با استیکر و امتیاز *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="ارزیابی کیفیت و بازدهی مطالعه *" @bind-Value="Model.QualityRating"
+                               Variant="Variant.Outlined" Required="true" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="5">⭐⭐⭐⭐⭐ عالی و با تمرکز بالا 😍</MudSelectItem>
+                        <MudSelectItem Value="4">⭐⭐⭐⭐ خوب و موثر 😊</MudSelectItem>
+                        <MudSelectItem Value="3">⭐⭐⭐ متوسط 😐</MudSelectItem>
+                        <MudSelectItem Value="2">⭐⭐ ضعیف / حواس‌پرتی داشتم 😞</MudSelectItem>
+                        <MudSelectItem Value="1">⭐ خیلی ضعیف و بی‌حوصله 😡</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @* فیلدهای مربوط به تست *@
+                <MudItem xs="12">
+                    <MudPaper Elevation="0" Class="pa-3 rounded-lg" Style="background-color: var(--mud-palette-background-grey); border: 1px solid var(--mud-palette-lines-default);">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2 text-primary">
+                            <MudIcon Icon="@Icons.Material.Filled.Quiz" Class="ml-1 align-middle" />
+                            اطلاعات و آمار تست‌زنی
+                        </MudText>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="4">
+                                <MudSelect T="string" Label="منبع تست" @bind-Value="Model.TestSource"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                                           AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var src in TestSources.All)
+                                    {
+                                        <MudSelectItem Value="@src">@src</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="int?" Label="تست صحیح" @bind-Value="Model.CorrectTests"
+                                                 Variant="Variant.Outlined" Min="0" Max="500" Margin="Margin.Dense" />
+                            </MudItem>
+
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="int?" Label="تست غلط" @bind-Value="Model.WrongTests"
+                                                 Variant="Variant.Outlined" Min="0" Max="500" Margin="Margin.Dense" />
+                            </MudItem>
+
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="int?" Label="تست نزده" @bind-Value="Model.UnansweredTests"
+                                                 Variant="Variant.Outlined" Min="0" Max="500" Margin="Margin.Dense" />
+                            </MudItem>
+
+                            <MudItem xs="6" sm="2" Class="d-flex align-center justify-center">
+                                @{
+                                    int c = Model.CorrectTests ?? 0;
+                                    int w = Model.WrongTests ?? 0;
+                                    int u = Model.UnansweredTests ?? 0;
+                                    int tot = c + w + u;
+                                    double acc = tot > 0 ? Math.Round((double)c / tot * 100, 1) : 0;
+                                }
+                                <div class="text-center">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">درصد پاسخگویی</MudText>
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold" Color="@(acc >= 70 ? Color.Success : (acc >= 50 ? Color.Warning : Color.Error))">
+                                        @acc%
+                                    </MudText>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+
+                @* توضیحات و یادداشت دانش‌آموز *@
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="توضیحات و گزارش کار شما (اشکالات مبحث، سوالات از مشاور و ...)"
+                                  @bind-Value="Model.StudentNote" Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                                  Placeholder="مثلاً در بخش حل مسائل سرعت مشکل داشتم یا فرمول‌ها نیاز به مرور مجدد دارند..." />
+                </MudItem>
+
+                @* آپلود فایل پیوست دانش‌آموز *@
+                <MudItem xs="12">
+                    <div class="d-flex align-center gap-3 flex-wrap pa-2 rounded-lg" style="background-color: var(--mud-palette-background-grey); border: 1px dashed var(--mud-palette-lines-default);">
+                        <MudFileUpload T="IBrowserFile" FilesChanged="UploadStudentFile" Accept=".pdf,.jpg,.jpeg,.png,.docx,.zip">
+                            <ActivatorContent>
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           StartIcon="@Icons.Material.Filled.AttachFile"
+                                           Disabled="isUploading">
+                                    @(isUploading ? "در حال آپلود..." : "پیوست تصویر خلاصه / پاسخ‌برگ / فایل گزارش کار")
+                                </MudButton>
+                            </ActivatorContent>
+                        </MudFileUpload>
+
+                        @if (!string.IsNullOrEmpty(Model.StudentAttachmentUrl))
+                        {
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" OnClose="RemoveAttachment">
+                                    @(Model.StudentAttachmentName ?? "فایل گزارش کار دانش‌آموز")
+                                </MudChip>
+                                <MudLink Href="@Model.StudentAttachmentUrl" Target="_blank">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" Color="Color.Primary" />
+                                </MudLink>
+                            </div>
+                        }
+                    </div>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Color="Color.Default">انصراف</MudButton>
+        <MudButton OnClick="SubmitFeedback" Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.DoneAll" Disabled="isSaving || isUploading">
+            @(isSaving ? "در حال ثبت..." : "ثبت نهایی بازخورد و کارنامه")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public StudyPlanItemDto Plan { get; set; } = new();
+
+    private MudForm form = null!;
+    private bool isValid;
+    private bool isSaving;
+    private bool isUploading;
+
+    private StudyFeedbackSubmitDto Model = new();
+
+    protected override void OnInitialized()
+    {
+        Model.PlanId = Plan.Id;
+        Model.StudentStatus = Plan.StudentStatus ?? "انجام کامل";
+        Model.QualityRating = Plan.QualityRating ?? 5;
+        Model.StudyPercentage = Plan.StudyPercentage ?? 100;
+        Model.ActualDurationMinutes = Plan.ActualDurationMinutes ?? Plan.DurationMinutes;
+        Model.CorrectTests = Plan.CorrectTests ?? (Plan.TestCount.HasValue ? (int)(Plan.TestCount.Value * 0.8) : null);
+        Model.WrongTests = Plan.WrongTests;
+        Model.UnansweredTests = Plan.UnansweredTests;
+        Model.StudentNote = Plan.StudentNote;
+        Model.StudentAttachmentUrl = Plan.StudentAttachmentUrl;
+        Model.StudentAttachmentName = Plan.StudentAttachmentName;
+        Model.TestSource = Plan.TestSource ?? TestSources.KheiliSabz;
+    }
+
+    private void OnStatusChanged()
+    {
+        if (Model.StudentStatus == "انجام نشد")
+        {
+            Model.StudyPercentage = 0;
+            Model.ActualDurationMinutes = 0;
+            Model.QualityRating = 1;
+        }
+        else if (Model.StudentStatus == "انجام کامل" && Model.StudyPercentage < 90)
+        {
+            Model.StudyPercentage = 100;
+        }
+    }
+
+    private async Task UploadStudentFile(IBrowserFile file)
+    {
+        if (file == null) return;
+        if (file.Size > 25 * 1024 * 1024)
+        {
+            Snackbar.Add("حداکثر حجم فایل مجاز ۲۵ مگابایت است.", Severity.Warning);
+            return;
+        }
+
+        isUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024));
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await Http.PostAsync("api/upload", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResponse>();
+                if (result != null && !string.IsNullOrEmpty(result.url))
+                {
+                    Model.StudentAttachmentUrl = result.url;
+                    Model.StudentAttachmentName = file.Name;
+                    Snackbar.Add("فایل با موفقیت پیوست شد.", Severity.Success);
+                }
+            }
+            else
+            {
+                Snackbar.Add("خطا در آپلود فایل", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا در آپلود: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void RemoveAttachment()
+    {
+        Model.StudentAttachmentUrl = null;
+        Model.StudentAttachmentName = null;
+    }
+
+    private async Task SubmitFeedback()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        isSaving = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/studyplans/{Plan.Id}/feedback", Model);
+            if (res.IsSuccessStatusCode)
+            {
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                if (apiRes?.Success == true)
+                {
+                    Snackbar.Add("بازخورد مطالعه شما با موفقیت ثبت شد.", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                    return;
+                }
+                Snackbar.Add(apiRes?.Message ?? "خطا در ثبت اطلاعات", Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add("خطا در ارتباط با سرور", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class UploadResponse
+    {
+        public string url { get; set; } = string.Empty;
+        public string fullUrl { get; set; } = string.Empty;
+    }
+}

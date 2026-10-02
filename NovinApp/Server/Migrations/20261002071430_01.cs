@@ -405,6 +405,31 @@ namespace NovinApp.Server.Migrations
                 name: "IX_StudentProfiles_SchoolId",
                 table: "StudentProfiles",
                 column: "SchoolId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_active",
+                table: "User",
+                column: "active");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_code_meli",
+                table: "User",
+                column: "code_meli");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_Id_Moshaver",
+                table: "User",
+                column: "Id_Moshaver");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_Id_School",
+                table: "User",
+                column: "Id_School");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_Rool",
+                table: "User",
+                column: "Rool");
         }
 
         /// <inheritdoc />

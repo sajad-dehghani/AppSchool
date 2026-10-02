@@ -1,0 +1,1071 @@
+@page "/StudyPlan"
+@page "/StudyPlanner"
+@page "/Frm_Plan"
+@using Microsoft.AspNetCore.Authorization
+@using NovinApp.Client.Service
+@using NovinApp.Client.Component.StudyPlan
+@using NovinApp.Shared.DTOs.Students
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject UserProfileStateService UserProfileState
+@attribute [Authorize]
+
+<div class="planner-banner mb-4">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="font-weight-bold text-white">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="ml-2 align-middle" />
+                سامانه هوشمند برنامه‌ریزی تحصیلی و تقویم مشاوره‌ای
+            </MudText>
+            <MudText Typo="Typo.body2" Class="text-white mt-1" Style="opacity: 0.9;">
+                @(UserProfileState.IsStudent 
+                    ? "مشاهده برنامه‌های درسی تنظیم‌شده توسط مشاور، ثبت گزارش عملکرد و درخواست جلسات مشاوره" 
+                    : "تنظیم برنامه‌های مطالعاتی، جلسات مشاوره حضوری/آنلاین و پایش بازخورد دانش‌آموزان")
+            </MudText>
+        </div>
+
+        <div class="d-flex align-center gap-2 flex-wrap">
+            @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Surface" Class="font-weight-bold text-primary"
+                           StartIcon="@Icons.Material.Filled.AddCircle" OnClick="OpenCreatePlanDialog">
+                    + ثبت برنامه جدید
+                </MudButton>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Surface" Class="font-weight-bold text-info"
+                           StartIcon="@Icons.Material.Filled.EventAvailable" OnClick="OpenCreateCounselingDialog">
+                    + وقت مشاوره
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined" Style="color: white; border-color: white;"
+                           StartIcon="@Icons.Material.Filled.LibraryBooks" OnClick="OpenTopicBankDialog">
+                    بانک مباحث
+                </MudButton>
+
+                <MudBadge Content="@pendingRequestsCount" Color="Color.Error" Overlap="true" Visible="@(pendingRequestsCount > 0)">
+                    <MudButton Variant="Variant.Outlined" Style="color: white; border-color: white;"
+                               StartIcon="@Icons.Material.Filled.NotificationsActive" OnClick="OpenRequestsDialog">
+                        درخواست‌های مشاوره
+                    </MudButton>
+                </MudBadge>
+            }
+            else if (UserProfileState.IsStudent)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Surface" Class="font-weight-bold text-secondary"
+                           StartIcon="@Icons.Material.Filled.PersonAddAlt1" OnClick="OpenStudentRequestDialog">
+                    درخواست جلسه مشاوره
+                </MudButton>
+            }
+
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Surface" Size="Size.Small"
+                           Variant="Variant.Filled" OnClick="RefreshData" Title="تازه‌سازی تقویم" />
+        </div>
+    </div>
+</div>
+
+@* کارت‌های خلاصه آماری عملکرد *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card" Style="border-right: 5px solid #1976D2;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ساعات مطالعه کل</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-primary">@stats.ActualCompletedHours / @stats.PlannedTotalHours ساعت</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">تحقق برنامه: @stats.CompletionRate%</MudText>
+                </div>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.AccessTimeFilled" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card" Style="border-right: 5px solid #2E7D32;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تعداد تست‌های حل‌شده</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1 text-success">@stats.TotalCorrectTests / @stats.TotalPlannedTests</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">دقت پاسخگویی: @stats.TestAccuracyRate%</MudText>
+                </div>
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.FactCheck" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card" Style="border-right: 5px solid #E65100;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">تست‌های صحیح / غلط</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold mt-1" Style="color: #E65100;">@stats.TotalCorrectTests صحیح / @stats.TotalWrongTests غلط</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@stats.TotalUnansweredTests نزده</MudText>
+                </div>
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card" Style="border-right: 5px solid #7B1FA2;">
+            <MudCardContent Class="d-flex align-center justify-space-between pa-4">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">وضعیت کل برنامه‌ها</MudText>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold mt-1" Style="color: #7B1FA2;">@stats.CompletedPlans انجام شده / @stats.TotalPlans کل</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">@stats.IncompletePlans ناقص | @stats.SkippedPlans انجام نشده</MudText>
+                </div>
+                <MudAvatar Color="Color.Secondary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.DonutLarge" />
+                </MudAvatar>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@* نوار کنترل تقویم و فیلترها *@
+<MudPaper Elevation="2" Class="pa-4 mb-4 rounded-lg">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+        @* دکمه‌های ناوبری تقویم *@
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                <MudButton OnClick="GoPreviousPeriod" StartIcon="@Icons.Material.Filled.ArrowForwardIos">قبلی</MudButton>
+                <MudButton OnClick="GoToToday" StartIcon="@Icons.Material.Filled.Today">امروز</MudButton>
+                <MudButton OnClick="GoNextPeriod" EndIcon="@Icons.Material.Filled.ArrowBackIos">بعدی</MudButton>
+            </MudButtonGroup>
+
+            <MudText Typo="Typo.h6" Class="font-weight-bold text-primary mr-2">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Class="ml-1 align-middle" />
+                @currentPeriodTitle
+            </MudText>
+        </div>
+
+        @* تب‌های تغییر نمای تقویم *@
+        <div class="d-flex align-center gap-3 flex-wrap">
+            @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+            {
+                <MudSelect T="int" Label="فیلتر دانش‌آموز" @bind-Value="selectedStudentUserId"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 220px;"
+                           AnchorOrigin="Origin.BottomCenter" SelectedValuesChanged="OnStudentSelectionChanged">
+                    <MudSelectItem Value="0">👥 همه دانش‌آموزان تحت نظر</MudSelectItem>
+                    @foreach (var st in studentList)
+                    {
+                        <MudSelectItem Value="@st.UserId">@st.FullName (@(st.GradeLevel ?? ""))</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudToggleGroup T="string" @bind-Value="calendarViewMode" Color="Color.Primary" Dense="true" Rounded="true" Outlined="true">
+                <MudToggleItem Value="@("Month")">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarViewMonth" Class="ml-1" Size="Size.Small" /> ماهانه
+                </MudToggleItem>
+                <MudToggleItem Value="@("Week")">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarViewWeek" Class="ml-1" Size="Size.Small" /> هفتگی
+                </MudToggleItem>
+                <MudToggleItem Value="@("List")">
+                    <MudIcon Icon="@Icons.Material.Filled.ViewAgenda" Class="ml-1" Size="Size.Small" /> لیست و جدول
+                </MudToggleItem>
+            </MudToggleGroup>
+        </div>
+    </div>
+</MudPaper>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-center align-center my-12">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+        <MudText Typo="Typo.subtitle1" Class="ms-3">در حال بارگذاری تقویم و برنامه‌ها...</MudText>
+    </div>
+}
+else
+{
+    @* ۱. نمای تقویم ماهانه شمسی *@
+    @if (calendarViewMode == "Month")
+    {
+        <MudPaper Elevation="3" Class="pa-3 rounded-lg mb-4">
+            <div class="calendar-grid-header">
+                <div class="cal-header-cell">شنبه</div>
+                <div class="cal-header-cell">یکشنبه</div>
+                <div class="cal-header-cell">دوشنبه</div>
+                <div class="cal-header-cell">سه‌شنبه</div>
+                <div class="cal-header-cell">چهارشنبه</div>
+                <div class="cal-header-cell">پنج‌شنبه</div>
+                <div class="cal-header-cell text-error">جمعه</div>
+            </div>
+
+            <div class="calendar-grid-body">
+                @foreach (var day in monthDays)
+                {
+                    var dayPlans = plans.Where(p => p.PersianDate == day.PersianDate).ToList();
+                    var isSelected = day.PersianDate == selectedDayDate;
+
+                    <div class="cal-day-cell @(day.IsCurrentMonth ? "in-month" : "out-month") @(day.IsToday ? "today-cell" : "") @(isSelected ? "selected-cell" : "")"
+                         @onclick="@(() => SelectDay(day.PersianDate))">
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <span class="day-number @(day.IsToday ? "today-badge" : "")">@day.Day</span>
+                            @if (dayPlans.Any())
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Style="height:18px; font-size:10px; padding:0 4px;">
+                                    @dayPlans.Count برنامه
+                                </MudChip>
+                            }
+                        </div>
+
+                        <div class="day-tasks-container">
+                            @foreach (var p in dayPlans.Take(3))
+                            {
+                                var badgeColor = GetActivityColor(p.ActivityType);
+                                <div class="task-pill @badgeColor" title="@p.Subject: @p.Topic (@p.StartTime)">
+                                    <span class="task-time">@p.StartTime</span>
+                                    <span class="task-subject">@p.Subject</span>
+                                    @if (p.Status == StudyTaskStatus.Completed)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Style="font-size:11px;" />
+                                    }
+                                </div>
+                            }
+                            @if (dayPlans.Count > 3)
+                            {
+                                <div class="more-tasks">+@(dayPlans.Count - 3) برنامه دیگر...</div>
+                            }
+                        </div>
+
+                        @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin)
+                        {
+                            <div class="cell-quick-add">
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                               OnClick="@((e) => OpenCreatePlanForDate(day.PersianDate))" Title="ثبت برنامه برای این روز" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    }
+
+    @* ۲. نمای تقویم هفتگی شمسی *@
+    @if (calendarViewMode == "Week")
+    {
+        <div class="week-calendar-grid mb-4">
+            @foreach (var wday in weekDays)
+            {
+                var wdayPlans = plans.Where(p => p.PersianDate == wday.PersianDate).OrderBy(p => p.StartTime).ToList();
+                var isSelected = wday.PersianDate == selectedDayDate;
+
+                <MudPaper Elevation="2" Class="@($"week-day-column {(wday.IsToday ? "week-today" : "")} {(isSelected ? "week-selected" : "")}")">
+                    <div class="week-day-header" @onclick="@(() => SelectDay(wday.PersianDate))">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@wday.DayOfWeekName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@wday.PersianDate</MudText>
+                        @if (wday.IsToday)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled" Style="height:18px; font-size:10px;">امروز</MudChip>
+                        }
+                    </div>
+
+                    <div class="week-tasks-list">
+                        @if (!wdayPlans.Any())
+                        {
+                            <div class="text-center py-4 text-muted" style="font-size: 12px;">
+                                برنامه‌ای ثبت نشده
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var wp in wdayPlans)
+                            {
+                                <MudPaper Elevation="1" Class="week-task-card pa-2 mb-2 rounded-lg" @onclick="@(() => OpenPlanDetails(wp))">
+                                    <div class="d-flex justify-space-between align-center mb-1">
+                                        <MudChip T="string" Size="Size.Small" Color="@GetActivityChipColor(wp.ActivityType)" Variant="Variant.Filled" Style="height:20px; font-size:11px;">
+                                            @wp.ActivityType
+                                        </MudChip>
+                                        <span class="font-weight-bold" style="font-size: 11px;">@wp.StartTime</span>
+                                    </div>
+
+                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold text-primary" Style="font-size: 13px;">
+                                        @wp.Subject
+                                    </MudText>
+
+                                    @if (!string.IsNullOrEmpty(wp.Topic))
+                                    {
+                                        <MudText Typo="Typo.caption" Class="d-block text-truncate" Style="max-width: 100%;">
+                                            @wp.Topic
+                                        </MudText>
+                                    }
+
+                                    <div class="d-flex justify-space-between align-center mt-2 pt-1" style="border-top: 1px dashed var(--mud-palette-lines-default); font-size: 11px;">
+                                        <span>⏱ @wp.DurationMinutes دقیقه</span>
+                                        @if (wp.Status == StudyTaskStatus.Completed)
+                                        {
+                                            <span class="text-success font-weight-bold">✅ انجام شد</span>
+                                        }
+                                        else if (wp.Status == StudyTaskStatus.Incomplete)
+                                        {
+                                            <span class="text-warning font-weight-bold">⚠️ ناقص</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">⏳ در انتظار</span>
+                                        }
+                                    </div>
+                                </MudPaper>
+                            }
+                        }
+                    </div>
+
+                    @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin)
+                    {
+                        <div class="pa-2 text-center" style="border-top: 1px solid var(--mud-palette-lines-default);">
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Add" FullWidth="true"
+                                       OnClick="@(() => OpenCreatePlanForDate(wday.PersianDate))">
+                                افزودن به این روز
+                            </MudButton>
+                        </div>
+                    }
+                </MudPaper>
+            }
+        </div>
+    }
+
+    @* بخش جزئیات برنامه‌های روز انتخاب شده یا جدول جامع *@
+    <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+        <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-3">
+            <div>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">
+                    <MudIcon Icon="@Icons.Material.Filled.FormatListBulleted" Class="ml-2 align-middle" />
+                    @(calendarViewMode == "List" ? "کلیه برنامه‌های مطالعاتی و جلسات مشاوره" : $"برنامه‌های روز: {selectedDayDate} ({selectedDayName})")
+                </MudText>
+            </div>
+
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <MudTextField @bind-Value="listSearchString" Placeholder="جستجو در درس، مبحث، دانش‌آموز..."
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width: 200px;" Immediate="true" />
+
+                <MudSelect T="string" @bind-Value="listActivityFilter" Label="نوع فعالیت" Margin="Margin.Dense"
+                           Variant="Variant.Outlined" Style="min-width: 140px;" Clearable="true">
+                    @foreach (var act in ActivityTypes.All)
+                    {
+                        <MudSelectItem Value="@act">@act</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (calendarViewMode != "List")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenCreatePlanForDate(selectedDayDate))">
+                        + برنامه برای این روز
+                    </MudButton>
+                }
+            </div>
+        </div>
+
+        @if (!FilteredDisplayPlans.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="rounded-lg my-4">
+                برای این بازه زمانی برنامه‌ای یافت نگردید.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@FilteredDisplayPlans" Hover="true" Striped="true" Elevation="0" Dense="true">
+                <HeaderContent>
+                    <MudTh>تاریخ و ساعت</MudTh>
+                    @if (!UserProfileState.IsStudent)
+                    {
+                        <MudTh>دانش‌آموز</MudTh>
+                    }
+                    <MudTh>نوع فعالیت</MudTh>
+                    <MudTh>درس و مبحث</MudTh>
+                    <MudTh>مدت / تست</MudTh>
+                    <MudTh>وضعیت بازخورد</MudTh>
+                    <MudTh>کیفیت و ارزیابی</MudTh>
+                    <MudTh>فایل پیوست</MudTh>
+                    <MudTh Style="width: 140px; text-align: center;">عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="تاریخ و ساعت">
+                        <div class="font-weight-bold">@context.PersianDate</div>
+                        <span class="text-muted" style="font-size: 11px;">ساعت: @context.StartTime</span>
+                    </MudTd>
+
+                    @if (!UserProfileState.IsStudent)
+                    {
+                        <MudTd DataLabel="دانش‌آموز">
+                            <span class="font-weight-bold text-primary">@context.StudentName</span>
+                        </MudTd>
+                    }
+
+                    <MudTd DataLabel="نوع فعالیت">
+                        <MudChip T="string" Size="Size.Small" Color="@GetActivityChipColor(context.ActivityType)" Variant="Variant.Filled">
+                            @context.ActivityType
+                        </MudChip>
+                    </MudTd>
+
+                    <MudTd DataLabel="درس و مبحث">
+                        <div class="font-weight-bold text-dark">@context.Subject</div>
+                        <div class="text-muted" style="font-size: 12px;">
+                            @(context.Topic ?? context.Chapter ?? "---")
+                        </div>
+                    </MudTd>
+
+                    <MudTd DataLabel="مدت / تست">
+                        <div>⏱ @context.DurationMinutes دقیقه</div>
+                        @if (context.TestCount.HasValue && context.TestCount > 0)
+                        {
+                            <span class="text-primary font-weight-bold" style="font-size: 11px;">
+                                🎯 @context.TestCount تست (@(context.TestType ?? "آموزشی"))
+                            </span>
+                        }
+                    </MudTd>
+
+                    <MudTd DataLabel="وضعیت بازخورد">
+                        @if (context.IsFeedbackSubmitted)
+                        {
+                            @if (context.Status == StudyTaskStatus.Completed)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+                                    ✅ انجام کامل (@(context.StudyPercentage ?? 100)%)
+                                </MudChip>
+                            }
+                            else if (context.Status == StudyTaskStatus.Incomplete)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                                    ⚠️ ناقص (@(context.StudyPercentage ?? 50)%)
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">
+                                    ❌ انجام نشد
+                                </MudChip>
+                            }
+                            @if (context.CorrectTests.HasValue)
+                            {
+                                <div style="font-size: 11px;" class="mt-1">
+                                    <span class="text-success font-weight-bold">@context.CorrectTests ص</span> |
+                                    <span class="text-error font-weight-bold">@(context.WrongTests ?? 0) غ</span> |
+                                    <span class="text-muted">@(context.TestSource ?? "")</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                ⏳ در انتظار ثبت گزارش
+                            </MudChip>
+                        }
+                    </MudTd>
+
+                    <MudTd DataLabel="کیفیت">
+                        @if (context.IsFeedbackSubmitted && context.QualityRating.HasValue)
+                        {
+                            <span style="font-size: 13px;">@QualityRatings.GetLabel(context.QualityRating.Value)</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">---</span>
+                        }
+                    </MudTd>
+
+                    <MudTd DataLabel="فایل پیوست">
+                        @if (!string.IsNullOrEmpty(context.ConsultantAttachmentUrl))
+                        {
+                            <MudTooltip Text="دانلود فایل مشاور">
+                                <MudIconButton Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Color="Color.Primary"
+                                               Href="@context.ConsultantAttachmentUrl" Target="_blank" />
+                            </MudTooltip>
+                        }
+                        @if (!string.IsNullOrEmpty(context.StudentAttachmentUrl))
+                        {
+                            <MudTooltip Text="دانلود فایل گزارش دانش‌آموز">
+                                <MudIconButton Icon="@Icons.Material.Filled.AssignmentTurnedIn" Size="Size.Small" Color="Color.Secondary"
+                                               Href="@context.StudentAttachmentUrl" Target="_blank" />
+                            </MudTooltip>
+                        }
+                        @if (!string.IsNullOrEmpty(context.MeetingLink))
+                        {
+                            <MudTooltip Text="ورود به جلسه آنلاین">
+                                <MudIconButton Icon="@Icons.Material.Filled.VideoCall" Size="Size.Small" Color="Color.Info"
+                                               Href="@context.MeetingLink" Target="_blank" />
+                            </MudTooltip>
+                        }
+                    </MudTd>
+
+                    <MudTd DataLabel="عملیات" Style="text-align: center;">
+                        <div class="d-flex justify-center align-center gap-1">
+                            @* ثبت بازخورد دانش‌آموز *@
+                            <MudTooltip Text="ثبت / ویرایش بازخورد دانش‌آموز">
+                                <MudIconButton Icon="@Icons.Material.Filled.FactCheck" Size="Size.Small" Color="Color.Success"
+                                               OnClick="@(() => OpenStudentFeedbackDialog(context))" />
+                            </MudTooltip>
+
+                            @* ویرایش و حذف برای مشاور / مدیر *@
+                            @if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin || UserProfileState.IsSchoolManager)
+                            {
+                                <MudTooltip Text="ویرایش برنامه">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                                   OnClick="@(() => OpenEditPlanDialog(context))" />
+                                </MudTooltip>
+
+                                <MudTooltip Text="حذف برنامه">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => DeletePlan(context.Id))" />
+                                </MudTooltip>
+                            }
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+<style>
+    .planner-banner {
+        border-radius: 16px;
+        padding: 22px 26px;
+        background: linear-gradient(135deg, #0F2027 0%, #203A43 50%, #2C5364 100%);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .stat-card {
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    }
+
+    /* استایل‌های تقویم ماهانه */
+    .calendar-grid-header {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+        margin-bottom: 4px;
+    }
+    .cal-header-cell {
+        background-color: var(--mud-palette-surface-darken);
+        padding: 8px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 13px;
+        border-radius: 6px;
+    }
+    .calendar-grid-body {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .cal-day-cell {
+        min-height: 105px;
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 8px;
+        padding: 6px;
+        position: relative;
+        cursor: pointer;
+        background-color: var(--mud-palette-surface);
+        transition: all 0.2s ease;
+    }
+    .cal-day-cell:hover {
+        border-color: var(--mud-palette-primary);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .cal-day-cell.out-month {
+        opacity: 0.45;
+        background-color: var(--mud-palette-background-grey);
+    }
+    .cal-day-cell.today-cell {
+        border: 2px solid var(--mud-palette-primary);
+        background-color: rgba(25, 118, 210, 0.04);
+    }
+    .cal-day-cell.selected-cell {
+        background-color: rgba(46, 125, 50, 0.08);
+        border-color: var(--mud-palette-success);
+    }
+    .day-number {
+        font-weight: bold;
+        font-size: 13px;
+    }
+    .today-badge {
+        background-color: var(--mud-palette-primary);
+        color: white;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+    }
+    .day-tasks-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 4px;
+    }
+    .task-pill {
+        font-size: 10px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: white;
+    }
+    .pill-blue { background-color: #1976D2; }
+    .pill-green { background-color: #2E7D32; }
+    .pill-orange { background-color: #E65100; }
+    .pill-purple { background-color: #7B1FA2; }
+    .pill-teal { background-color: #00796B; }
+    .pill-cyan { background-color: #0097A7; }
+    .pill-grey { background-color: #616161; }
+    .more-tasks {
+        font-size: 10px;
+        color: var(--mud-palette-primary);
+        font-weight: bold;
+        text-align: center;
+    }
+    .cell-quick-add {
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .cal-day-cell:hover .cell-quick-add {
+        opacity: 1;
+    }
+
+    /* استایل‌های تقویم هفتگی */
+    .week-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+    }
+    @@media (max-width: 960px) {
+        .week-calendar-grid {
+            grid-template-columns: 1fr;
+        }
+        .calendar-grid-body {
+            grid-template-columns: repeat(7, 1fr);
+        }
+    }
+    .week-day-column {
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        min-height: 280px;
+    }
+    .week-day-header {
+        padding: 8px;
+        text-align: center;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        cursor: pointer;
+    }
+    .week-today {
+        border: 2px solid var(--mud-palette-primary);
+    }
+    .week-selected {
+        background-color: rgba(46, 125, 50, 0.04);
+    }
+    .week-tasks-list {
+        padding: 6px;
+        flex-grow: 1;
+        overflow-y: auto;
+        max-height: 400px;
+    }
+    .week-task-card {
+        cursor: pointer;
+        transition: transform 0.15s;
+        border: 1px solid var(--mud-palette-lines-default);
+    }
+    .week-task-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--mud-palette-primary);
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private string calendarViewMode = "Month"; // Month, Week, List
+
+    private DateTime currentNavDate = DateTime.Now;
+    private int currentPersianYear;
+    private int currentPersianMonth;
+    private string currentPeriodTitle = "";
+
+    private string selectedDayDate = "";
+    private string selectedDayName = "";
+
+    private List<PersianCalendarDayInfo> monthDays = new();
+    private List<PersianCalendarDayInfo> weekDays = new();
+
+    private List<StudyPlanItemDto> plans = new();
+    private List<StudentDto> studentList = new();
+    private int selectedStudentUserId = 0;
+    private int pendingRequestsCount = 0;
+
+    private StudyPlannerStatsDto stats = new();
+
+    private string listSearchString = "";
+    private string listActivityFilter = "";
+
+    private IEnumerable<StudyPlanItemDto> FilteredDisplayPlans
+    {
+        get
+        {
+            var query = plans.AsEnumerable();
+
+            if (calendarViewMode != "List" && !string.IsNullOrEmpty(selectedDayDate))
+            {
+                query = query.Where(p => p.PersianDate == selectedDayDate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(listActivityFilter))
+            {
+                query = query.Where(p => p.ActivityType == listActivityFilter);
+            }
+
+            if (!string.IsNullOrWhiteSpace(listSearchString))
+            {
+                query = query.Where(p =>
+                    (p.Subject?.Contains(listSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (p.Topic?.Contains(listSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (p.StudentName?.Contains(listSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (p.ConsultantNote?.Contains(listSearchString, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            return query.OrderBy(p => p.PersianDate).ThenBy(p => p.StartTime);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var (y, m, _) = PersianDateHelper.GetPersianParts(currentNavDate);
+        currentPersianYear = y;
+        currentPersianMonth = m;
+
+        selectedDayDate = PersianDateHelper.NowPersianDate();
+        selectedDayName = PersianDateHelper.GetPersianDayOfWeek(DateTime.Now);
+
+        await LoadStudents();
+        await RefreshData();
+    }
+
+    private async Task LoadStudents()
+    {
+        if (!UserProfileState.IsStudent)
+        {
+            try
+            {
+                var res = await Http.GetFromJsonAsync<ApiResponse<List<StudentDto>>>("api/students");
+                if (res?.Success == true && res.Data != null)
+                    studentList = res.Data;
+            }
+            catch { }
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        isLoading = true;
+        try
+        {
+            // محاسبه روزهای تقویم ماهانه و هفتگی
+            monthDays = PersianDateHelper.GetMonthCalendarDays(currentPersianYear, currentPersianMonth);
+            weekDays = PersianDateHelper.GetWeekDays(currentNavDate);
+
+            var monthName = PersianDateHelper.GetPersianMonthName(currentPersianMonth);
+            currentPeriodTitle = $"{monthName} {currentPersianYear}";
+
+            // بازه تاریخی مورد نظر برای دریافت برنامه‌ها
+            var startDate = monthDays.First().PersianDate;
+            var endDate = monthDays.Last().PersianDate;
+
+            string url = $"api/studyplans?startPersianDate={startDate}&endPersianDate={endDate}";
+            if (selectedStudentUserId > 0)
+                url += $"&studentUserId={selectedStudentUserId}";
+
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<StudyPlanItemDto>>>(url);
+            if (res?.Success == true && res.Data != null)
+                plans = res.Data;
+
+            // دریافت آمار
+            string statsUrl = $"api/studyplans/stats?startPersianDate={startDate}&endPersianDate={endDate}";
+            if (selectedStudentUserId > 0) statsUrl += $"&studentUserId={selectedStudentUserId}";
+            var statsRes = await Http.GetFromJsonAsync<ApiResponse<StudyPlannerStatsDto>>(statsUrl);
+            if (statsRes?.Success == true && statsRes.Data != null)
+                stats = statsRes.Data;
+
+            // دریافت تعداد درخواست‌های مشاوره در انتظار
+            if (UserProfileState.IsConsultant || UserProfileState.IsSystemAdmin)
+            {
+                var reqsRes = await Http.GetFromJsonAsync<ApiResponse<List<CounselingRequestDto>>>("api/studyplans/counseling-requests");
+                if (reqsRes?.Success == true && reqsRes.Data != null)
+                    pendingRequestsCount = reqsRes.Data.Count(r => r.Status == CounselingStatus.Pending);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا در بارگذاری اطلاعات: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnStudentSelectionChanged()
+    {
+        await RefreshData();
+    }
+
+    private void SelectDay(string persianDate)
+    {
+        selectedDayDate = persianDate;
+        if (PersianDateHelper.TryParsePersianDate(persianDate, out var dt))
+            selectedDayName = PersianDateHelper.GetPersianDayOfWeek(dt);
+    }
+
+    private async Task GoPreviousPeriod()
+    {
+        if (calendarViewMode == "Week")
+        {
+            currentNavDate = currentNavDate.AddDays(-7);
+            var (y, m, _) = PersianDateHelper.GetPersianParts(currentNavDate);
+            currentPersianYear = y;
+            currentPersianMonth = m;
+        }
+        else
+        {
+            currentPersianMonth--;
+            if (currentPersianMonth < 1)
+            {
+                currentPersianMonth = 12;
+                currentPersianYear--;
+            }
+            currentNavDate = PersianDateHelper.PersianToGregorian(currentPersianYear, currentPersianMonth, 1);
+        }
+        await RefreshData();
+    }
+
+    private async Task GoNextPeriod()
+    {
+        if (calendarViewMode == "Week")
+        {
+            currentNavDate = currentNavDate.AddDays(7);
+            var (y, m, _) = PersianDateHelper.GetPersianParts(currentNavDate);
+            currentPersianYear = y;
+            currentPersianMonth = m;
+        }
+        else
+        {
+            currentPersianMonth++;
+            if (currentPersianMonth > 12)
+            {
+                currentPersianMonth = 1;
+                currentPersianYear++;
+            }
+            currentNavDate = PersianDateHelper.PersianToGregorian(currentPersianYear, currentPersianMonth, 1);
+        }
+        await RefreshData();
+    }
+
+    private async Task GoToToday()
+    {
+        currentNavDate = DateTime.Now;
+        var (y, m, _) = PersianDateHelper.GetPersianParts(currentNavDate);
+        currentPersianYear = y;
+        currentPersianMonth = m;
+        selectedDayDate = PersianDateHelper.NowPersianDate();
+        selectedDayName = PersianDateHelper.GetPersianDayOfWeek(DateTime.Now);
+        await RefreshData();
+    }
+
+    private Color GetActivityChipColor(string activityType) => activityType switch
+    {
+        ActivityTypes.Test => Color.Primary,
+        ActivityTypes.Study => Color.Success,
+        ActivityTypes.Video => Color.Info,
+        ActivityTypes.Class => Color.Warning,
+        ActivityTypes.DescriptiveQuestions => Color.Tertiary,
+        ActivityTypes.InPersonCounseling => Color.Secondary,
+        ActivityTypes.OnlineCounseling => Color.Dark,
+        ActivityTypes.Exam => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetActivityColor(string activityType) => activityType switch
+    {
+        ActivityTypes.Test => "pill-blue",
+        ActivityTypes.Study => "pill-green",
+        ActivityTypes.Video => "pill-cyan",
+        ActivityTypes.Class => "pill-orange",
+        ActivityTypes.DescriptiveQuestions => "pill-teal",
+        ActivityTypes.InPersonCounseling => "pill-purple",
+        ActivityTypes.OnlineCounseling => "pill-purple",
+        ActivityTypes.Exam => "pill-orange",
+        _ => "pill-grey"
+    };
+
+    // دیالوگ‌های مختلف
+    private async Task OpenCreatePlanDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "PreselectedStudentUserId", selectedStudentUserId > 0 ? selectedStudentUserId : (int?)null },
+            { "PreselectedPersianDate", selectedDayDate }
+        };
+        var dialog = await DialogService.ShowAsync<PlanCreateEditDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenCreatePlanForDate(string persianDate)
+    {
+        var parameters = new DialogParameters
+        {
+            { "PreselectedStudentUserId", selectedStudentUserId > 0 ? selectedStudentUserId : (int?)null },
+            { "PreselectedPersianDate", persianDate }
+        };
+        var dialog = await DialogService.ShowAsync<PlanCreateEditDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenEditPlanDialog(StudyPlanItemDto plan)
+    {
+        var dto = new StudyPlanCreateUpdateDto
+        {
+            Id = plan.Id,
+            StudentUserId = plan.StudentUserId,
+            StudentName = plan.StudentName,
+            PersianDate = plan.PersianDate,
+            StartTime = plan.StartTime,
+            DurationMinutes = plan.DurationMinutes,
+            ActivityType = plan.ActivityType,
+            TestCount = plan.TestCount,
+            TestType = plan.TestType,
+            GradeLevel = plan.GradeLevel,
+            FieldOfStudy = plan.FieldOfStudy,
+            Subject = plan.Subject,
+            Chapter = plan.Chapter,
+            Topic = plan.Topic,
+            ConsultantNote = plan.ConsultantNote,
+            ConsultantAttachmentUrl = plan.ConsultantAttachmentUrl,
+            ConsultantAttachmentName = plan.ConsultantAttachmentName,
+            IsCounselingSession = plan.IsCounselingSession,
+            CounselingType = plan.CounselingType,
+            MeetingLink = plan.MeetingLink
+        };
+
+        var parameters = new DialogParameters { { "Model", dto } };
+        var dialog = await DialogService.ShowAsync<PlanCreateEditDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenCreateCounselingDialog()
+    {
+        var dto = new StudyPlanCreateUpdateDto
+        {
+            ActivityType = ActivityTypes.OnlineCounseling,
+            IsCounselingSession = true,
+            Subject = "جلسه مشاوره و راهنمایی تحصیلی",
+            PersianDate = selectedDayDate,
+            DurationMinutes = 45,
+            StudentUserId = selectedStudentUserId > 0 ? selectedStudentUserId : 0
+        };
+        var parameters = new DialogParameters { { "Model", dto } };
+        var dialog = await DialogService.ShowAsync<PlanCreateEditDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenStudentFeedbackDialog(StudyPlanItemDto plan)
+    {
+        var parameters = new DialogParameters { { "Plan", plan } };
+        var dialog = await DialogService.ShowAsync<StudentFeedbackDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenPlanDetails(StudyPlanItemDto plan)
+    {
+        if (UserProfileState.IsStudent)
+            await OpenStudentFeedbackDialog(plan);
+        else
+            await OpenEditPlanDialog(plan);
+    }
+
+    private async Task OpenStudentRequestDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "IsConsultantView", false },
+            { "Model", new CounselingRequestDto { RequestType = "مشاوره آنلاین", PreferredDate = selectedDayDate } }
+        };
+        var dialog = await DialogService.ShowAsync<CounselingRequestDialog>("", parameters);
+        var res = await dialog.Result;
+        if (!res.Canceled) await RefreshData();
+    }
+
+    private async Task OpenRequestsDialog()
+    {
+        try
+        {
+            var reqsRes = await Http.GetFromJsonAsync<ApiResponse<List<CounselingRequestDto>>>("api/studyplans/counseling-requests");
+            if (reqsRes?.Success == true && reqsRes.Data?.Count > 0)
+            {
+                var firstPending = reqsRes.Data.FirstOrDefault(r => r.Status == CounselingStatus.Pending) ?? reqsRes.Data.First();
+                var parameters = new DialogParameters
+                {
+                    { "IsConsultantView", true },
+                    { "Model", firstPending }
+                };
+                var dialog = await DialogService.ShowAsync<CounselingRequestDialog>("", parameters);
+                var res = await dialog.Result;
+                if (!res.Canceled) await RefreshData();
+            }
+            else
+            {
+                Snackbar.Add("درخواست مشاوره جدیدی وجود ندارد.", Severity.Info);
+            }
+        }
+        catch { }
+    }
+
+    private async Task OpenTopicBankDialog()
+    {
+        await DialogService.ShowAsync<TopicBankDialog>("");
+    }
+
+    private async Task DeletePlan(int planId)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "حذف برنامه",
+            "آیا از حذف این برنامه از تقویم اطمینان دارید؟",
+            yesText: "بله، حذف شود", cancelText: "انصراف");
+
+        if (confirm == true)
+        {
+            var res = await Http.DeleteAsync($"api/studyplans/{planId}");
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("برنامه با موفقیت حذف شد.", Severity.Info);
+                await RefreshData();
+            }
+        }
+    }
+}

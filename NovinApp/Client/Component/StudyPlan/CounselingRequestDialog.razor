@@ -1,0 +1,197 @@
+@using NovinApp.Shared.DTOs.Common
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            <MudText Typo="Typo.h6" Class="font-weight-bold mb-3 text-primary">
+                <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Class="ml-2 align-middle" />
+                @(IsConsultantView ? "بررسی و تعیین وقت جلسه مشاوره" : "درخواست وقت مشاوره (حضوری / آنلاین)")
+            </MudText>
+            <MudDivider Class="mb-3" />
+
+            <MudGrid Spacing="2">
+                @if (!IsConsultantView)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            مشاور شما پس از بررسی درخواست، ساعت نهایی و لینک جلسه را تایید و در تقویم شما قرار خواهد داد.
+                        </MudAlert>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" Label="نوع جلسه مشاوره *" @bind-Value="Model.RequestType"
+                                   Variant="Variant.Outlined" Required="true" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="@("مشاوره آنلاین")">🌐 مشاوره آنلاین (صوتی / تصویری)</MudSelectItem>
+                            <MudSelectItem Value="@("مشاوره حضوری")">🏢 مشاوره حضوری در مدرسه / مرکز</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="تاریخ پیشنهادی شما" @bind-Date="prefDate"
+                                       Variant="Variant.Outlined" Culture="@PersianDateHelper.GetPersianCulture()"
+                                       TitleDateFormat="dddd, dd MMMM" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTimePicker Label="ساعت پیشنهادی" @bind-Time="prefTime"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="موضوع مشاوره و سوالات اصلی شما *" @bind-Value="Model.Description"
+                                      Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense" Required="true"
+                                      RequiredError="توضیح موضوع مشاوره الزامی است"
+                                      Placeholder="مثلاً برنامه‌ریزی برای کنکور تجربی، روش حل تست زیست، افت تراز در آزمون آزمایشی اخیر..." />
+                    </MudItem>
+
+                    @if (Model.RequestType == "مشاوره آنلاین")
+                    {
+                        <MudItem xs="12">
+                            <MudTextField T="string" Label="لینک جلسه آنلاین (در صورت وجود)" @bind-Value="Model.MeetingLink"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          Placeholder="در صورت نیاز می‌توانید لینک اسکای‌روم، گوگل‌میت یا ادوبی‌کانکت خود را بگذارید" />
+                        </MudItem>
+                    }
+                }
+                else
+                {
+                    @* بخش مشاور برای تایید یا پاسخ *@
+                    <MudItem xs="12">
+                        <MudPaper Elevation="0" Class="pa-3 rounded-lg mb-2" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold text-primary">دانش‌آموز: @Model.StudentName</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-1"><strong>نوع:</strong> @Model.RequestType | <strong>تاریخ پیشنهادی:</strong> @(Model.PreferredDate ?? "مشخص نشده") ساعت @(Model.PreferredTime ?? "---")</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2"><strong>درخواست دانش‌آموز:</strong> @Model.Description</MudText>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="CounselingStatus" Label="وضعیت درخواست *" @bind-Value="Model.Status"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="CounselingStatus.Approved">✅ تایید و ثبت در تقویم</MudSelectItem>
+                            <MudSelectItem Value="CounselingStatus.Pending">⏳ در انتظار بررسی</MudSelectItem>
+                            <MudSelectItem Value="CounselingStatus.Rejected">❌ عدم امکان در این زمان</MudSelectItem>
+                            <MudSelectItem Value="CounselingStatus.Completed">✔️ انجام شده</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="تاریخ قطعی جلسه" @bind-Date="prefDate"
+                                       Variant="Variant.Outlined" Culture="@PersianDateHelper.GetPersianCulture()"
+                                       TitleDateFormat="dddd, dd MMMM" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTimePicker Label="ساعت قطعی جلسه" @bind-Time="prefTime"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="لینک جلسه آنلاین (Skyroom/Google Meet)" @bind-Value="Model.MeetingLink"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="https://skyroom.online/..." />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="پیام و راهنمایی مشاور برای دانش‌آموز" @bind-Value="Model.ConsultantResponse"
+                                      Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense"
+                                      Placeholder="مثلاً جلسه در تاریخ مقرر در اتاق مشاوره / لینک اسکای‌روم برگزار خواهد شد..." />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Color="Color.Default">انصراف</MudButton>
+        <MudButton OnClick="SaveRequest" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="isSaving">
+            @(isSaving ? "در حال ثبت..." : (IsConsultantView ? "ثبت پاسخ مشاور" : "ارسال درخواست مشاوره"))
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CounselingRequestDto Model { get; set; } = new();
+    [Parameter] public bool IsConsultantView { get; set; }
+
+    private MudForm form = null!;
+    private bool isValid;
+    private bool isSaving;
+
+    private DateTime? prefDate = DateTime.Now.AddDays(1);
+    private TimeSpan? prefTime = new TimeSpan(16, 0, 0);
+
+    protected override void OnInitialized()
+    {
+        if (Model.Id > 0)
+        {
+            var dateStr = Model.ScheduledDate ?? Model.PreferredDate;
+            if (!string.IsNullOrEmpty(dateStr) && PersianDateHelper.TryParsePersianDate(dateStr, out var dt))
+                prefDate = dt;
+
+            var timeStr = Model.ScheduledTime ?? Model.PreferredTime;
+            if (!string.IsNullOrEmpty(timeStr) && TimeSpan.TryParse(timeStr, out var ts))
+                prefTime = ts;
+        }
+    }
+
+    private async Task SaveRequest()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        if (prefDate.HasValue)
+        {
+            var pDateStr = PersianDateHelper.ToPersianDateString(prefDate.Value);
+            if (IsConsultantView)
+                Model.ScheduledDate = pDateStr;
+            else
+                Model.PreferredDate = pDateStr;
+        }
+
+        if (prefTime.HasValue)
+        {
+            var pTimeStr = $"{prefTime.Value.Hours:00}:{prefTime.Value.Minutes:00}";
+            if (IsConsultantView)
+                Model.ScheduledTime = pTimeStr;
+            else
+                Model.PreferredTime = pTimeStr;
+        }
+
+        isSaving = true;
+        try
+        {
+            HttpResponseMessage res;
+            if (Model.Id > 0)
+                res = await Http.PutAsJsonAsync($"api/studyplans/counseling-requests/{Model.Id}", Model);
+            else
+                res = await Http.PostAsJsonAsync("api/studyplans/counseling-requests", Model);
+
+            if (res.IsSuccessStatusCode)
+            {
+                var apiRes = await res.Content.ReadFromJsonAsync<ApiResponse<object>>();
+                if (apiRes?.Success == true)
+                {
+                    Snackbar.Add(IsConsultantView ? "وضعیت جلسه مشاوره با موفقیت ثبت شد." : "درخواست مشاوره شما با موفقیت ارسال شد.", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                    return;
+                }
+                Snackbar.Add(apiRes?.Message ?? "خطا در پردازش", Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add("خطا در ارتباط با سرور", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطا: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
